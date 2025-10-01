@@ -1,0 +1,21 @@
+{
+  "name": "trevor",
+  "version": "0.1.0",
+  "module": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch src/index.ts",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "cheerio": "^1.1.2",
+    "grammy": "^1.38.2"
+  }
+}

@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+bun.lockb
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Claude
+.claude/

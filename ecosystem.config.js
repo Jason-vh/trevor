@@ -1,0 +1,16 @@
+module.exports = {
+  apps: [{
+    name: 'trevor',
+    script: 'check-availability.ts',
+    interpreter: 'bun',
+    args: '--start 17:25 --end 18:30 --days tue,wed',
+    cron_restart: '*/15 * * * *',
+    autorestart: false,
+    watch: false,
+    instances: 1,
+    exec_mode: 'fork',
+    env: {
+      NODE_ENV: 'production'
+    }
+  }]
+};
