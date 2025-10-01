@@ -56,7 +56,7 @@ Use PM2 for automated monitoring with cron restart:
 npm install -g pm2
 
 # Start Trevor
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.cjs
 
 # Save PM2 config to restart on reboot
 pm2 save
@@ -69,7 +69,7 @@ pm2 logs trevor
 pm2 stop trevor
 ```
 
-The `ecosystem.config.js` is configured to check every 15 minutes for Tuesday/Wednesday slots between 17:25-18:30.
+The `ecosystem.config.cjs` is configured to check every 15 minutes for Tuesday/Wednesday slots between 17:25-18:30.
 
 ## Tech Stack
 

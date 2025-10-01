@@ -108,11 +108,11 @@ bun run check-availability.ts --start 17:00 --end 18:00 --days tue,wed
 
 **PM2 deployment** (recommended):
 ```bash
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.cjs
 pm2 logs trevor
 ```
 
-The `ecosystem.config.js` is configured to:
+The `ecosystem.config.cjs` is configured to:
 - Run every 15 minutes via cron restart (`*/15 * * * *`)
 - Check Tuesday/Wednesday slots from 17:25-18:30
 - Use Bun as the interpreter
