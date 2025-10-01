@@ -297,13 +297,11 @@ async function main() {
     console.log(`📊 Total: ${totalSlots} time slots available`);
   }
 
-  // Send Telegram message if configured
-  if (config.telegram?.botToken && config.telegram?.chatId) {
+  // Send Telegram message only if slots were found
+  if (totalSlots > 0 && config.telegram?.botToken && config.telegram?.chatId) {
     const timeRange = `${args.start}-${args.end}`;
     const message = formatTelegramMessage(results, timeRange, args.days);
     await sendTelegramMessage(config.telegram.botToken, config.telegram.chatId, message);
-  } else {
-    console.log('\n⚠️  Telegram not configured (missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID)');
   }
 }
 
