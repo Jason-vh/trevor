@@ -79,12 +79,12 @@ function timeToMinutes(time: string): number {
 }
 
 /**
- * Get current date/time in NL timezone
+ * Get current date/time in configured timezone
  */
 function getNLDate(): Date {
   const now = new Date();
-  // Convert to NL timezone (Europe/Amsterdam)
-  const nlTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Amsterdam' }));
+  const timezone = process.env.TZ || 'Europe/Amsterdam';
+  const nlTime = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
   return nlTime;
 }
 
@@ -115,12 +115,13 @@ function formatDate(date: Date): string {
 }
 
 /**
- * Get day name from date (NL timezone)
+ * Get day name from date (configured timezone)
  */
 function getDayName(date: Date): string {
+  const timezone = process.env.TZ || 'Europe/Amsterdam';
   return date.toLocaleDateString('en-US', {
     weekday: 'long',
-    timeZone: 'Europe/Amsterdam'
+    timeZone: timezone
   });
 }
 
