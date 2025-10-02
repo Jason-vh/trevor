@@ -26,5 +26,8 @@ dist/
 build/
 *.tsbuildinfo
 
+# State data
+data/slot-state.json
+
 # Claude
 .claude/

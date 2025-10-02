@@ -7,6 +7,7 @@ import { login } from './src/modules/auth';
 import { fetchPage } from './src/modules/scraper';
 import { parseReservationsPage } from './src/modules/parser';
 import { isSafeForTesting } from './src/modules/booking';
+import { loadState, saveState, compareStates, updateState, pruneOldEntries } from './src/modules/state';
 import type { Availability } from './src/types';
 
 interface CliArgs {
@@ -188,10 +189,11 @@ function groupByTime(slots: Availability[]): GroupedSlot[] {
 function formatTelegramMessage(results: DayResults[], timeRange: string, days: string[]): string {
   if (results.length === 0) {
     return `🎾 *Trevor Court Availability*\n\n` +
-           `No available slots found for ${timeRange} on ${days.join(', ')}.`;
+           `No newly available slots found for ${timeRange} on ${days.join(', ')}.`;
   }
 
   let message = `🎾 *Trevor Court Availability*\n\n`;
+  message += `✨ *New slots available!*\n`;
   message += `Time: ${timeRange}\n`;
   message += `Days: ${days.join(', ')}\n\n`;
 
@@ -210,7 +212,7 @@ function formatTelegramMessage(results: DayResults[], timeRange: string, days: s
     message += '\n';
   }
 
-  message += `📊 Total: ${totalSlots} time slot${totalSlots !== 1 ? 's' : ''} available`;
+  message += `📊 Total: ${totalSlots} newly available time slot${totalSlots !== 1 ? 's' : ''}`;
 
   return message;
 }
@@ -247,6 +249,10 @@ async function main() {
 
   console.log(`🔍 Checking availability: ${args.start}-${args.end} on ${args.days.join(', ')}\n`);
 
+  // Load previous state and prune old entries
+  let previousState = await loadState();
+  previousState = pruneOldEntries(previousState);
+
   // Login
   const config = loadConfig();
   const session = await login(config);
@@ -265,7 +271,7 @@ async function main() {
 
   // Check availability for each date
   const sportId = 15; // Squash
-  const results: DayResults[] = [];
+  const allCurrentSlots: Availability[] = [];
 
   for (const date of targetDates) {
     const dateString = formatDate(date);
@@ -277,30 +283,55 @@ async function main() {
       const html = await fetchPage(url, session);
       const allSlots = parseReservationsPage(html, dateString);
 
-      // Filter by time range
+      // Filter by time range and store all matching slots
       const filteredSlots = filterByTimeRange(allSlots, args.start, args.end);
-
-      if (filteredSlots.length > 0) {
-        // Group by time
-        const grouped = groupByTime(filteredSlots);
-
-        // Store results
-        results.push({
-          dayName,
-          dateString,
-          slots: grouped,
-        });
-
-        // Output to terminal
-        console.log(`${dayName} ${dateString}`);
-        for (const slot of grouped) {
-          const safetyIndicator = slot.safe ? '✅' : '⚠️  (within 48h)';
-          console.log(`  ${slot.time} (45min) - Courts: ${slot.courts.join(', ')} ${safetyIndicator}`);
-        }
-        console.log('');
-      }
+      allCurrentSlots.push(...filteredSlots);
     } catch (error) {
       console.error(`⚠️  Failed to fetch ${dayName} ${dateString}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  // Compare with previous state to find newly available slots
+  const newlyAvailableSlots = compareStates(previousState, allCurrentSlots);
+
+  // Update state with all current slots
+  const newState = updateState(previousState, allCurrentSlots);
+  await saveState(newState);
+
+  // Group newly available slots by day for output
+  const results: DayResults[] = [];
+
+  if (newlyAvailableSlots.length > 0) {
+    // Group by date
+    const slotsByDate = new Map<string, Availability[]>();
+    for (const slot of newlyAvailableSlots) {
+      const existing = slotsByDate.get(slot.dateString);
+      if (existing) {
+        existing.push(slot);
+      } else {
+        slotsByDate.set(slot.dateString, [slot]);
+      }
+    }
+
+    // Format for output
+    for (const [dateString, slots] of slotsByDate) {
+      const date = new Date(dateString);
+      const dayName = getDayName(date);
+      const grouped = groupByTime(slots);
+
+      results.push({
+        dayName,
+        dateString,
+        slots: grouped,
+      });
+
+      // Output to terminal
+      console.log(`${dayName} ${dateString}`);
+      for (const slot of grouped) {
+        const safetyIndicator = slot.safe ? '✅' : '⚠️  (within 48h)';
+        console.log(`  ${slot.time} (45min) - Courts: ${slot.courts.join(', ')} ${safetyIndicator}`);
+      }
+      console.log('');
     }
   }
 
@@ -308,12 +339,12 @@ async function main() {
   const totalSlots = results.reduce((sum, day) => sum + day.slots.length, 0);
 
   if (totalSlots === 0) {
-    console.log('No available slots found matching criteria.');
+    console.log('No new slots available (all previously seen or still booked).');
   } else {
-    console.log(`📊 Total: ${totalSlots} time slots available`);
+    console.log(`📊 Total: ${totalSlots} newly available time slot${totalSlots !== 1 ? 's' : ''}`);
   }
 
-  // Send Telegram message only if slots were found
+  // Send Telegram message only if new slots were found
   if (totalSlots > 0 && config.telegram?.botToken && config.telegram?.chatId) {
     const timeRange = `${args.start}-${args.end}`;
     const message = formatTelegramMessage(results, timeRange, args.days);
