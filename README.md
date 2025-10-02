@@ -69,7 +69,7 @@ pm2 logs trevor
 pm2 stop trevor
 ```
 
-The `ecosystem.config.cjs` is configured to check every 15 minutes for Tuesday/Wednesday slots between 17:25-18:30.
+The `ecosystem.config.cjs` is configured to check every 15 minutes for Tuesday/Wednesday slots between 17:25-18:30 (using Europe/Amsterdam timezone).
 
 ## Tech Stack
 

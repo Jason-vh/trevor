@@ -117,6 +117,7 @@ The `ecosystem.config.cjs` is configured to:
 - Check Tuesday/Wednesday slots from 17:25-18:30
 - Use Bun as the interpreter
 - Exit after each run (autorestart: false)
+- Use Europe/Amsterdam timezone (`TZ=Europe/Amsterdam`)
 
 ## Critical Implementation Details
 
