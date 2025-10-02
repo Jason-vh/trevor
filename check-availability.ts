@@ -79,11 +79,21 @@ function timeToMinutes(time: string): number {
 }
 
 /**
- * Get next 7 days from today
+ * Get current date/time in NL timezone
+ */
+function getNLDate(): Date {
+  const now = new Date();
+  // Convert to NL timezone (Europe/Amsterdam)
+  const nlTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Amsterdam' }));
+  return nlTime;
+}
+
+/**
+ * Get next 7 days from today (NL timezone)
  */
 function getNext7Days(): Date[] {
   const dates: Date[] = [];
-  const today = new Date();
+  const today = getNLDate();
 
   for (let i = 0; i < 7; i++) {
     const date = new Date(today);
@@ -95,7 +105,7 @@ function getNext7Days(): Date[] {
 }
 
 /**
- * Format date as YYYY-MM-DD (using local timezone)
+ * Format date as YYYY-MM-DD (NL timezone)
  */
 function formatDate(date: Date): string {
   const year = date.getFullYear();
@@ -105,11 +115,13 @@ function formatDate(date: Date): string {
 }
 
 /**
- * Get day name from date
+ * Get day name from date (NL timezone)
  */
 function getDayName(date: Date): string {
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  return days[date.getDay()];
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    timeZone: 'Europe/Amsterdam'
+  });
 }
 
 /**
