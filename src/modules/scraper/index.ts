@@ -2,10 +2,12 @@
 
 import type { Session } from '../../types';
 import { ScraperError, ErrorCode } from '../../utils/errors';
-import { logger } from '../../utils/logger';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('scraper');
 
 export async function fetchPage(url: string, session: Session): Promise<string> {
-  logger.info('scraper', 'Fetching page', { url });
+  logger.info('Fetching page', { url });
 
   try {
     // Convert cookies array to Cookie header string
@@ -47,7 +49,7 @@ export async function fetchPage(url: string, session: Session): Promise<string> 
     // Get HTML content
     const html = await response.text();
 
-    logger.info('scraper', 'Page fetched successfully', {
+    logger.info('Page fetched successfully', {
       url,
       size: html.length
     });

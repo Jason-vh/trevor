@@ -3,7 +3,9 @@
 import * as cheerio from 'cheerio';
 import type { Session, BookingRequest, BookingResult, Availability } from '../../types';
 import { ScraperError, ErrorCode } from '../../utils/errors';
-import { logger } from '../../utils/logger';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('booking');
 
 const HOURS_48_IN_SECONDS = 48 * 60 * 60;
 
@@ -29,7 +31,7 @@ async function getBookingForm(
 ): Promise<{ csrfToken: string; endTime: string; playerId: string; updatedCookies: string[] }> {
   const formUrl = `${baseUrl}/reservations/make/${courtId}/${timestamp}`;
 
-  logger.info('booking', 'Fetching booking form', { formUrl });
+  logger.info('Fetching booking form', { formUrl });
 
   // Inject cookies into request
   const cookieHeader = session.cookies
@@ -79,7 +81,7 @@ async function getBookingForm(
   const playerIdOption = $('select[name="players[1]"] option').first();
   const playerId = playerIdOption.val() as string || '';
 
-  logger.info('booking', 'Booking form fetched', {
+  logger.info('Booking form fetched', {
     csrfToken: csrfToken.substring(0, 10) + '...',
     endTime,
     playerId: playerId || 'none',
@@ -119,7 +121,7 @@ async function submitBooking(
     });
   }
 
-  logger.info('booking', 'Submitting booking', {
+  logger.info('Submitting booking', {
     url: confirmUrl,
     court: request.resourceId,
     date: request.date,
@@ -144,7 +146,7 @@ async function submitBooking(
     redirect: 'manual', // Handle redirects manually
   });
 
-  logger.info('booking', 'Booking response received', {
+  logger.info('Booking response received', {
     status: response.status,
     statusText: response.statusText,
   });
@@ -153,7 +155,7 @@ async function submitBooking(
   if (response.status === 302 || response.status === 303) {
     // Redirect typically means success
     const location = response.headers.get('location');
-    logger.info('booking', 'Booking redirect (likely success)', { location });
+    logger.info('Booking redirect (likely success)', { location });
 
     return {
       success: true,
@@ -165,7 +167,7 @@ async function submitBooking(
     // Check response body (could be HTML or plain text)
     const body = await response.text();
 
-    logger.info('booking', 'HTTP 200 response body preview', {
+    logger.info('HTTP 200 response body preview', {
       bodyStart: body.substring(0, 200),
       bodyLength: body.length,
     });
@@ -189,7 +191,7 @@ async function submitBooking(
     }
 
     // HTTP 200 without redirect may not be real success
-    logger.warn('booking', 'HTTP 200 without redirect - booking may not be confirmed');
+    logger.warn('HTTP 200 without redirect - booking may not be confirmed');
 
     return {
       success: false,
@@ -227,7 +229,7 @@ export async function bookSlot(
       );
     }
 
-    logger.info('booking', 'Starting booking process', {
+    logger.info('Starting booking process', {
       court: availability.court,
       date: availability.dateString,
       time: availability.timeSlot,
@@ -255,7 +257,7 @@ export async function bookSlot(
 
     const result = await submitBooking(baseUrl, bookingRequest, csrfToken, updatedCookies, availability.timestamp);
 
-    logger.info('booking', 'Booking completed', {
+    logger.info('Booking completed', {
       success: result.success,
       message: result.message,
     });

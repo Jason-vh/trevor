@@ -3,10 +3,12 @@
 import * as cheerio from 'cheerio';
 import type { Availability } from '../../types';
 import { ScraperError, ErrorCode } from '../../utils/errors';
-import { logger } from '../../utils/logger';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('parser');
 
 export function parseReservationsPage(html: string, date?: string): Availability[] {
-  logger.info('parser', 'Parsing reservations page', { htmlSize: html.length, requestedDate: date });
+  logger.info('Parsing reservations page', { htmlSize: html.length, requestedDate: date });
 
   try {
     const $ = cheerio.load(html);
@@ -28,7 +30,7 @@ export function parseReservationsPage(html: string, date?: string): Availability
       }
     });
 
-    logger.info('parser', 'Found courts', {
+    logger.info('Found courts', {
       count: courtNames.size,
       courts: Array.from(courtNames.values()),
       date: pageDate,
@@ -71,7 +73,7 @@ export function parseReservationsPage(html: string, date?: string): Availability
       });
     });
 
-    logger.info('parser', 'Parsing complete', {
+    logger.info('Parsing complete', {
       availabilityCount: availabilities.length,
     });
 

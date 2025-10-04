@@ -1,57 +1,42 @@
-// Logging utility
+import { Axiom } from "@axiomhq/js";
+import { AxiomJSTransport, ConsoleTransport, Logger } from "@axiomhq/logging";
 
-export type LogLevel = 'info' | 'warn' | 'error' | 'debug';
-
-export interface LogEntry {
-  timestamp: Date;
-  level: LogLevel;
-  module: string;
-  message: string;
-  metadata?: Record<string, unknown>;
+if (!Bun.env.AXIOM_TOKEN || !Bun.env.AXIOM_DATASET) {
+  throw new Error("AXIOM_TOKEN or AXIOM_DATASET are not set");
 }
 
-class Logger {
-  log(level: LogLevel, module: string, message: string, metadata?: Record<string, unknown>) {
-    const entry: LogEntry = {
-      timestamp: new Date(),
-      level,
-      module,
-      message,
-      metadata,
-    };
+console.log("Logging to Axiom dataset", Bun.env.AXIOM_DATASET);
 
-    const formattedMessage = `[${entry.timestamp.toISOString()}] [${level.toUpperCase()}] [${module}] ${message}`;
+const axiom = new Axiom({
+  token: Bun.env.AXIOM_TOKEN,
+});
 
-    switch (level) {
-      case 'error':
-        console.error(formattedMessage, metadata || '');
-        break;
-      case 'warn':
-        console.warn(formattedMessage, metadata || '');
-        break;
-      case 'debug':
-        console.debug(formattedMessage, metadata || '');
-        break;
-      default:
-        console.log(formattedMessage, metadata || '');
-    }
-  }
+const logger = new Logger({
+  transports: [
+    new AxiomJSTransport({
+      axiom,
+      dataset: Bun.env.AXIOM_DATASET,
+    }),
+    new ConsoleTransport({
+      prettyPrint: true,
+      logLevel: "debug",
+    }),
+  ],
+});
 
-  info(module: string, message: string, metadata?: Record<string, unknown>) {
-    this.log('info', module, message, metadata);
-  }
-
-  warn(module: string, message: string, metadata?: Record<string, unknown>) {
-    this.log('warn', module, message, metadata);
-  }
-
-  error(module: string, message: string, metadata?: Record<string, unknown>) {
-    this.log('error', module, message, metadata);
-  }
-
-  debug(module: string, message: string, metadata?: Record<string, unknown>) {
-    this.log('debug', module, message, metadata);
-  }
-}
-
-export const logger = new Logger();
+export const createLogger = (scope: string) => {
+  return {
+    debug(message: string, args: Record<string, unknown> = {}) {
+      logger.debug(`[${scope}] ${message}`, args);
+    },
+    info(message: string, args: Record<string, unknown> = {}) {
+      logger.info(`[${scope}] ${message}`, args);
+    },
+    warn(message: string, args: Record<string, unknown> = {}) {
+      logger.warn(`[${scope}] ${message}`, args);
+    },
+    error(message: string, args: Record<string, unknown> = {}) {
+      logger.error(`[${scope}] ${message}`, args);
+    },
+  };
+};

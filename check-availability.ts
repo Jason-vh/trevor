@@ -8,7 +8,10 @@ import { fetchPage } from './src/modules/scraper';
 import { parseReservationsPage } from './src/modules/parser';
 import { isSafeForTesting } from './src/modules/booking';
 import { loadState, saveState, compareStates, updateState, pruneOldEntries } from './src/modules/state';
+import { createLogger } from './src/utils/logger';
 import type { Availability } from './src/types';
+
+const logger = createLogger('check-availability');
 
 interface CliArgs {
   start: string; // HH:MM format
@@ -227,9 +230,11 @@ async function sendTelegramMessage(botToken: string, chatId: string, message: st
     await bot.api.sendMessage(chatId, message, {
       parse_mode: 'Markdown',
     });
-    console.log('✅ Message sent to Telegram\n');
+    logger.info('Message sent to Telegram');
   } catch (error) {
-    console.error('⚠️  Failed to send Telegram message:', error instanceof Error ? error.message : String(error));
+    logger.error('Failed to send Telegram message', {
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 }
 
@@ -247,7 +252,10 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`🔍 Checking availability: ${args.start}-${args.end} on ${args.days.join(', ')}\n`);
+  logger.info('Checking availability', {
+    timeRange: `${args.start}-${args.end}`,
+    days: args.days
+  });
 
   // Load previous state and prune old entries
   let previousState = await loadState();
@@ -265,7 +273,7 @@ async function main() {
   const targetDates = allDates.filter(date => requestedDayNumbers.includes(date.getDay()));
 
   if (targetDates.length === 0) {
-    console.log('No matching days found in the next 7 days.');
+    logger.info('No matching days found in the next 7 days');
     return;
   }
 
@@ -287,7 +295,11 @@ async function main() {
       const filteredSlots = filterByTimeRange(allSlots, args.start, args.end);
       allCurrentSlots.push(...filteredSlots);
     } catch (error) {
-      console.error(`⚠️  Failed to fetch ${dayName} ${dateString}: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error('Failed to fetch date', {
+        dayName,
+        dateString,
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   }
 
@@ -325,23 +337,29 @@ async function main() {
         slots: grouped,
       });
 
-      // Output to terminal
-      console.log(`${dayName} ${dateString}`);
-      for (const slot of grouped) {
-        const safetyIndicator = slot.safe ? '✅' : '⚠️  (within 48h)';
-        console.log(`  ${slot.time} (45min) - Courts: ${slot.courts.join(', ')} ${safetyIndicator}`);
-      }
-      console.log('');
+      // Log results
+      logger.info('Found newly available slots', {
+        dayName,
+        dateString,
+        slots: grouped.map(s => ({
+          time: s.time,
+          courts: s.courts,
+          safe: s.safe
+        }))
+      });
     }
   }
 
-  // Terminal summary
+  // Summary
   const totalSlots = results.reduce((sum, day) => sum + day.slots.length, 0);
 
   if (totalSlots === 0) {
-    console.log('No new slots available (all previously seen or still booked).');
+    logger.info('No new slots available (all previously seen or still booked)');
   } else {
-    console.log(`📊 Total: ${totalSlots} newly available time slot${totalSlots !== 1 ? 's' : ''}`);
+    logger.info('Summary', {
+      totalSlots,
+      message: `${totalSlots} newly available time slot${totalSlots !== 1 ? 's' : ''}`
+    });
   }
 
   // Send Telegram message only if new slots were found

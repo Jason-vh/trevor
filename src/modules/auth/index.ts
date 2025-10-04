@@ -2,10 +2,12 @@
 
 import type { Session, Config } from '../../types';
 import { ScraperError, ErrorCode } from '../../utils/errors';
-import { logger } from '../../utils/logger';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('auth');
 
 export async function login(config: Config): Promise<Session> {
-  logger.info('auth', 'Attempting login', { url: config.loginUrl });
+  logger.info('Attempting login', { url: config.loginUrl });
 
   try {
     // Prepare form data
@@ -51,7 +53,7 @@ export async function login(config: Config): Promise<Session> {
       expiresAt: new Date(Date.now() + config.options.sessionTimeout * 1000),
     };
 
-    logger.info('auth', 'Login successful', {
+    logger.info('Login successful', {
       cookieCount: cookies.length,
       expiresAt: session.expiresAt
     });

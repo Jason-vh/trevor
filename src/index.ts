@@ -1,6 +1,6 @@
 // Application entry point
 
-import { logger } from './utils/logger';
+import { createLogger } from './utils/logger';
 import { loadConfig } from './config';
 import { login, isSessionValid } from './modules/auth';
 import { fetchPage } from './modules/scraper';
@@ -8,15 +8,17 @@ import { parseReservationsPage } from './modules/parser';
 import { withRetry } from './utils/retry';
 import { ScraperError } from './utils/errors';
 
+const logger = createLogger('main');
+
 async function main() {
   try {
-    logger.info('main', 'Starting squash court booking scraper');
+    logger.info('Starting squash court booking scraper');
 
     const config = loadConfig();
-    logger.info('main', 'Configuration loaded successfully');
+    logger.info('Configuration loaded successfully');
 
     // Step 1: Login and get session
-    logger.info('main', 'Authenticating...');
+    logger.info('Authenticating...');
     const session = await withRetry(
       () => login(config),
       {
@@ -29,10 +31,10 @@ async function main() {
       throw new Error('Session is invalid after login');
     }
 
-    logger.info('main', 'Authentication successful');
+    logger.info('Authentication successful');
 
     // Step 2: Fetch reservations page
-    logger.info('main', 'Fetching reservations page...');
+    logger.info('Fetching reservations page...');
     const html = await withRetry(
       () => fetchPage(config.reservationsUrl, session),
       {
@@ -41,33 +43,33 @@ async function main() {
       }
     );
 
-    logger.info('main', 'Reservations page fetched successfully');
+    logger.info('Reservations page fetched successfully');
 
     // Step 3: Parse availability data
-    logger.info('main', 'Parsing availability data...');
+    logger.info('Parsing availability data...');
     const availabilities = parseReservationsPage(html);
 
-    logger.info('main', 'Parsing complete', {
+    logger.info('Parsing complete', {
       availabilityCount: availabilities.length,
     });
 
     // Step 4: Display results
     if (availabilities.length === 0) {
-      logger.info('main', 'No availability data found - HTML structure inspection needed');
-      logger.info('main', 'Check logs for HTML sample to determine correct selectors');
+      logger.info('No availability data found - HTML structure inspection needed');
+      logger.info('Check logs for HTML sample to determine correct selectors');
     } else {
-      logger.info('main', 'Available slots:', { availabilities });
+      logger.info('Available slots:', { availabilities });
     }
 
-    logger.info('main', 'Application completed successfully');
+    logger.info('Application completed successfully');
   } catch (error) {
     if (error instanceof ScraperError) {
-      logger.error('main', `Application failed: ${error.code}`, {
+      logger.error(`Application failed: ${error.code}`, {
         message: error.message,
         retryable: error.retryable,
       });
     } else {
-      logger.error('main', 'Application failed', {
+      logger.error('Application failed', {
         error: error instanceof Error ? error.message : String(error),
       });
     }
