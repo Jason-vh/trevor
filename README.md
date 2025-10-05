@@ -4,93 +4,117 @@
   <img src="trevor.png" alt="Trevor the Squash Bot" width="200">
 </div>
 
-Trevor is an automated bot that monitors squash court availability at [SquashCity](https://squashcity.baanreserveren.nl/) and sends notifications via Telegram when slots become available.
+Trevor monitors squash court availability at [SquashCity](https://squashcity.baanreserveren.nl/) and alerts you via Telegram when new slots appear.
 
 ## What Trevor Does
 
-- 🔍 **Monitors availability** - Checks court schedules every 15 minutes
-- 📱 **Telegram notifications** - Sends alerts when your preferred time slots open up
-- 🎾 **Automated booking** - Can book courts automatically (with 48-hour safety check to avoid cancellation fees)
+- 🔍 **Monitors availability** - Checks schedules every 15 minutes (configurable)
+- 📱 **Smart notifications** - Only notifies when _new_ slots appear (no spam)
+- 🧠 **State tracking** - Remembers what was available last time to detect changes
+- 📊 **Optional logging** - Ships logs to Axiom for debugging
 
 ## Quick Start
 
 1. **Install dependencies**
+
    ```bash
    bun install
    ```
 
 2. **Configure credentials**
+
    ```bash
    cp .env.example .env.local
-   # Add your SquashCity username/password and Telegram bot token
+   # Edit .env.local with your SquashCity credentials and Telegram bot token
    ```
 
-3. **Check availability**
+3. **Run once**
+
    ```bash
-   bun run check-availability.ts --start 17:00 --end 18:00 --days tue,wed
+   bun start --start 17:00 --end 18:00 --day tue --day wed
+   ```
+
+4. **Run continuously with PM2** _(recommended)_
+   ```bash
+   npm install -g pm2
+   pm2 start ecosystem.config.cjs
+   pm2 save && pm2 startup
    ```
 
 ## Usage
 
-### Check Availability
 ```bash
-bun run check-availability.ts --start 17:00 --end 18:00 --days tue,wed
+bun start [options]
 ```
 
-This will:
-- Check the next 7 days for Tuesday/Wednesday slots between 17:00-18:00
-- Output results to terminal
-- Send a Telegram message with available courts
+**Options:**
 
-### Book a Slot
+- `--start HH:MM` - Filter slots starting at or after this time
+- `--end HH:MM` - Filter slots ending at or before this time
+- `--day <day>` - Days to check (mon/tue/wed/thu/fri/sat/sun). Repeat for multiple: `--day tue --day wed`
+
+**Examples:**
+
 ```bash
-bun run examples/book-slot.ts
+# Tuesday/Wednesday evenings
+bun start --start 17:00 --end 20:00 --day tue --day wed
+
+# Weekend mornings
+bun start --start 08:00 --end 12:00 --day sat --day sun
 ```
 
-**Safety feature**: Only books slots 48+ hours in the future to avoid cancellation fees during testing.
-
-### Run with PM2 (Recommended)
-Use PM2 for automated monitoring with cron restart:
-```bash
-# Install PM2 globally
-npm install -g pm2
-
-# Start Trevor
-pm2 start ecosystem.config.cjs
-
-# Save PM2 config to restart on reboot
-pm2 save
-pm2 startup
-
-# View logs
-pm2 logs trevor
-
-# Stop Trevor
-pm2 stop trevor
-```
-
-The `ecosystem.config.cjs` is configured to check every 15 minutes for Tuesday/Wednesday slots between 17:25-18:30 (using Europe/Amsterdam timezone).
-
-## Tech Stack
-
-- **[Bun](https://bun.sh)** - Fast JavaScript runtime with native TypeScript
-- **[Grammy](https://grammy.dev)** - Telegram bot framework
-- **[Cheerio](https://cheerio.js.org)** - HTML parsing (no headless browser needed!)
-- **SQLite** - Track slot history to detect new availability
+The bot checks the next 7 days and only sends Telegram notifications when availability _changes_ from the last run.
 
 ## Environment Variables
 
-Required in `.env.local`:
-```bash
-# SquashCity credentials
-USERNAME=your_username
-PASSWORD=your_password
+Create a `.env.local` file:
 
-# Telegram bot (create via @BotFather)
+```bash
+# Required: SquashCity login
+SQUASH_CITY_USERNAME=your_username
+SQUASH_CITY_PASSWORD=your_password
+
+# Required: Telegram notifications (get from @BotFather)
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
+
+# Optional: Axiom logging
+AXIOM_TOKEN=your_token
+AXIOM_DATASET=your_dataset
 ```
+
+## How It Works
+
+1. Logs into SquashCity with your credentials
+2. Scrapes court availability for the next 7 days
+3. Filters by your time/day preferences
+4. Compares with previous state (`data/state.json`)
+5. Sends Telegram alert if new slots appeared
+6. Saves current state for next run
+
+Uses lightweight scraping with `fetch` + Cheerio (no headless browser needed).
+
+## Tech Stack
+
+- **[Bun](https://bun.sh)** - Fast TypeScript runtime
+- **[Grammy](https://grammy.dev)** - Telegram bot framework
+- **[Cheerio](https://cheerio.js.org)** - Server-side HTML parsing
+- **[Axiom](https://axiom.co)** - Optional logging
+
+## PM2 Configuration
+
+The included `ecosystem.config.cjs` runs Trevor every 15 minutes via cron:
+
+```javascript
+{
+  cron_restart: '*/15 * * * *',  // Every 15 minutes
+  args: '--start 17:25 --end 18:30 --day tue --day wed --day thu',
+  env: { TZ: 'Europe/Amsterdam' }
+}
+```
+
+Edit the file to customize your schedule and preferences.
 
 ## License
 
-Personal project for automating squash court bookings. Use at your own risk.
+Personal project. Use responsibly and be considerate of server load.
