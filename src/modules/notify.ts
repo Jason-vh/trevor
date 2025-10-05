@@ -10,10 +10,10 @@ export function buildMessage(slots: CourtAvailability[], from: string, to: strin
 
   let message = "Hello! I've found some newly available squash courts:\n\n";
   for (const [date, slotsForDate] of groupedByDate) {
-    message += `*${date}*\n`;
+    message += `🗓️ *${date}*\n`;
 
     for (const [time, slotsForTime] of slotsForDate) {
-      message += `  ${time} - ${slotsForTime.map((slot) => slot.courtName).join(", ")}\n`;
+      message += `- ${time}: ${slotsForTime.map((slot) => slot.courtName).join(", ")}\n`;
     }
 
     message += "\n";
