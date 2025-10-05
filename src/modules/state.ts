@@ -12,11 +12,16 @@ export function saveState(slots: CourtAvailability[]): void {
 }
 
 export async function loadState(): Promise<CourtAvailability[]> {
-  const slots: CourtAvailability[] = await Bun.file(STATE_FILE_PATH).json();
+  try {
+    const slots: CourtAvailability[] = await Bun.file(STATE_FILE_PATH).json();
 
-  logger.info(`Loaded ${slots.length} slots from state`);
+    logger.info(`Loaded ${slots.length} slots from state`);
 
-  return slots;
+    return slots;
+  } catch (error) {
+    logger.error("Error loading state", { error });
+    return [];
+  }
 }
 
 export function findChangedSlots(oldSlots: CourtAvailability[], newSlots: CourtAvailability[]): CourtAvailability[] {
