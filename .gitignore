@@ -27,7 +27,7 @@ build/
 *.tsbuildinfo
 
 # State data
-data/slot-state.json
+data/*
 
 # Claude
 .claude/

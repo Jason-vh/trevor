@@ -1,80 +1,32 @@
-// Application entry point
+import { login } from "@/modules/auth";
+import { buildMessage, notify } from "@/modules/notify";
+import { getAllSlotsOnDate } from "@/modules/slots";
+import { findChangedSlots, loadState, saveState } from "@/modules/state";
+import { getArgs } from "@/utils/args";
+import { getNextDays } from "@/utils/datetime";
+import { logger } from "@/utils/logger";
 
-import { createLogger } from './utils/logger';
-import { loadConfig } from './config';
-import { login, isSessionValid } from './modules/auth';
-import { fetchPage } from './modules/scraper';
-import { parseReservationsPage } from './modules/parser';
-import { withRetry } from './utils/retry';
-import { ScraperError } from './utils/errors';
+const DAYS_TO_LOOK_AHEAD = 7;
 
-const logger = createLogger('main');
+const args = getArgs();
 
-async function main() {
-  try {
-    logger.info('Starting squash court booking scraper');
+const upcomingDays = getNextDays(DAYS_TO_LOOK_AHEAD).filter(({ day }) => args.days.includes(day));
+logger.info("We're looking for availability on the following dates", { upcomingDays, ...args });
 
-    const config = loadConfig();
-    logger.info('Configuration loaded successfully');
+const session = await login();
 
-    // Step 1: Login and get session
-    logger.info('Authenticating...');
-    const session = await withRetry(
-      () => login(config),
-      {
-        maxRetries: config.options.maxRetries,
-        retryDelay: config.options.retryDelay,
-      }
-    );
+const slotsPerDay = await Promise.all(upcomingDays.map(async ({ date }) => await getAllSlotsOnDate(session, date)));
+const allSlots = slotsPerDay.flat();
 
-    if (!isSessionValid(session)) {
-      throw new Error('Session is invalid after login');
-    }
+const changedSlots = findChangedSlots(await loadState(), allSlots);
+logger.info(`Found ${changedSlots.length} changed slots`, { changedSlots });
 
-    logger.info('Authentication successful');
+saveState(allSlots);
 
-    // Step 2: Fetch reservations page
-    logger.info('Fetching reservations page...');
-    const html = await withRetry(
-      () => fetchPage(config.reservationsUrl, session),
-      {
-        maxRetries: config.options.maxRetries,
-        retryDelay: config.options.retryDelay,
-      }
-    );
-
-    logger.info('Reservations page fetched successfully');
-
-    // Step 3: Parse availability data
-    logger.info('Parsing availability data...');
-    const availabilities = parseReservationsPage(html);
-
-    logger.info('Parsing complete', {
-      availabilityCount: availabilities.length,
-    });
-
-    // Step 4: Display results
-    if (availabilities.length === 0) {
-      logger.info('No availability data found - HTML structure inspection needed');
-      logger.info('Check logs for HTML sample to determine correct selectors');
-    } else {
-      logger.info('Available slots:', { availabilities });
-    }
-
-    logger.info('Application completed successfully');
-  } catch (error) {
-    if (error instanceof ScraperError) {
-      logger.error(`Application failed: ${error.code}`, {
-        message: error.message,
-        retryable: error.retryable,
-      });
-    } else {
-      logger.error('Application failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-    process.exit(1);
-  }
+if (changedSlots.length === 0) {
+  logger.info("Exiting as no changed slots were found");
+  process.exit(0);
 }
 
-main();
+const message = buildMessage(changedSlots, args.from, args.to);
+notify(message);

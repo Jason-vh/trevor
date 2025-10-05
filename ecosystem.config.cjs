@@ -3,7 +3,7 @@ module.exports = {
     name: 'trevor',
     script: 'check-availability.ts',
     interpreter: 'bun',
-    args: '--start 17:25 --end 18:30 --days tue,wed',
+    args: '--start 17:25 --end 18:30 --day tue --day wed --day thu',
     cron_restart: '*/15 * * * *',
     autorestart: false,
     watch: false,
