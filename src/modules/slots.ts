@@ -21,7 +21,7 @@ export function filterByTimeRange(slots: CourtAvailability[], startTime: string,
 
   return slots.filter((slot) => {
     const slotMinutes = getTimeInMinutes(slot.formattedStartTime);
-    return slotMinutes >= startMinutes && slotMinutes < endMinutes;
+    return slotMinutes >= startMinutes && slotMinutes <= endMinutes;
   });
 }
 
