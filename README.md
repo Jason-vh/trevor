@@ -31,7 +31,7 @@ Trevor monitors squash court availability at [SquashCity](https://squashcity.baa
 3. **Run once**
 
    ```bash
-   bun start --start 17:00 --end 18:00 --day tue --day wed
+   bun start --from 17:00 --to 18:00 --day tue --day wed
    ```
 
 4. **Run continuously with PM2** _(recommended)_
@@ -49,18 +49,18 @@ bun start [options]
 
 **Options:**
 
-- `--start HH:MM` - Filter slots starting at or after this time
-- `--end HH:MM` - Filter slots ending at or before this time
+- `--from HH:MM` - Filter slots starting at or after this time
+- `--to HH:MM` - Filter slots ending at or before this time
 - `--day <day>` - Days to check (mon/tue/wed/thu/fri/sat/sun). Repeat for multiple: `--day tue --day wed`
 
 **Examples:**
 
 ```bash
 # Tuesday/Wednesday evenings
-bun start --start 17:00 --end 20:00 --day tue --day wed
+bun start --from 17:00 --to 20:00 --day tue --day wed
 
 # Weekend mornings
-bun start --start 08:00 --end 12:00 --day sat --day sun
+bun start --from 08:00 --to 12:00 --day sat --day sun
 ```
 
 The bot checks the next 7 days and only sends Telegram notifications when availability _changes_ from the last run.
@@ -108,7 +108,7 @@ The included `ecosystem.config.cjs` runs Trevor every 15 minutes via cron:
 ```javascript
 {
   cron_restart: '*/15 * * * *',  // Every 15 minutes
-  args: '--start 17:25 --end 18:30 --day tue --day wed --day thu',
+  args: '--from 17:25 --to 18:30 --day tue --day wed --day thu',
   env: { TZ: 'Europe/Amsterdam' }
 }
 ```
