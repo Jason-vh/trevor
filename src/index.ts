@@ -25,10 +25,11 @@ async function main() {
   saveState(allSlots);
 
   const availableChangedSlots = changedSlots.filter((slot) => slot.isAvailable);
+  logger.info(`Found ${availableChangedSlots.length} available changed slots`, { availableChangedSlots });
 
   if (availableChangedSlots.length === 0) {
     logger.info("Exiting as no available changed slots were found");
-    process.exit(0);
+    return;
   }
 
   const message = buildMessage(availableChangedSlots, args.from, args.to);
