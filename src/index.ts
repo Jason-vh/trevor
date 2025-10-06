@@ -1,6 +1,6 @@
 import { login } from "@/modules/auth";
 import { buildMessage, notify } from "@/modules/notify";
-import { getAllSlotsOnDate } from "@/modules/slots";
+import { filterAndGroupSlots, getAllSlotsOnDate } from "@/modules/slots";
 import { findChangedSlots, loadState, saveState } from "@/modules/state";
 import { getArgs } from "@/utils/args";
 import { getNextDays } from "@/utils/datetime";
@@ -24,15 +24,14 @@ async function main() {
 
   saveState(allSlots);
 
-  const availableChangedSlots = changedSlots.filter((slot) => slot.isAvailable);
-  logger.info(`Found ${availableChangedSlots.length} available changed slots`, { availableChangedSlots });
+  const groupedSlots = filterAndGroupSlots(changedSlots, args.from, args.to);
 
-  if (availableChangedSlots.length === 0) {
-    logger.info("Exiting as no available changed slots were found");
+  if (groupedSlots.size === 0) {
+    logger.info("Exiting - no useful slots found");
     return;
   }
 
-  const message = buildMessage(availableChangedSlots, args.from, args.to);
+  const message = buildMessage(groupedSlots);
   notify(message);
 }
 

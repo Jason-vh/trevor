@@ -1,13 +1,10 @@
 import { Bot } from "grammy";
 
-import { filterAndGroupSlots } from "@/modules/slots";
 import type { CourtAvailability } from "@/types";
 import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
 
-export function buildMessage(slots: CourtAvailability[], from: string, to: string): string {
-  const groupedByDate = filterAndGroupSlots(slots, from, to);
-
+export function buildMessage(groupedByDate: Map<string, Map<string, CourtAvailability[]>>): string {
   let message = "Hello! I've found some newly available squash courts:\n\n";
   for (const [date, slotsForDate] of groupedByDate) {
     message += `🗓️ *${date}*\n`;
