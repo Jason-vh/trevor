@@ -7,7 +7,7 @@ import { getNextDays } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
 
 async function main() {
-  const DAYS_TO_LOOK_AHEAD = 7;
+  const DAYS_TO_LOOK_AHEAD = 8;
 
   const args = getArgs();
 
