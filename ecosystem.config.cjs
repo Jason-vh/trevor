@@ -3,7 +3,7 @@ module.exports = {
     name: 'trevor',
     script: 'src/index.ts',
     interpreter: 'bun',
-    args: '--from 17:15 --to 19:00 --day tue --day wed --day thu --day sun',
+    args: '--from 17:15 --to 19:00 --day tue --day wed --day thu',
     cron_restart: '*/15 * * * *',
     autorestart: false,
     watch: false,
