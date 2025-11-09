@@ -10,6 +10,7 @@ async function main() {
   const DAYS_TO_LOOK_AHEAD = 8;
 
   const args = getArgs();
+  console.log(args, getNextDays(DAYS_TO_LOOK_AHEAD));
 
   const upcomingDays = getNextDays(DAYS_TO_LOOK_AHEAD).filter(({ day }) => args.days.includes(day));
   logger.info("We're looking for availability on the following dates", { upcomingDays, ...args });
