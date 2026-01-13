@@ -55,6 +55,17 @@ function groupByTime(slots: CourtAvailability[]) {
   }, new Map<string, CourtAvailability[]>());
 }
 
+export function groupSlotsByDateAndTime(slots: CourtAvailability[]): Map<string, Map<string, CourtAvailability[]>> {
+  const groupedByDate = groupByDate(slots);
+  const groupedByTime: Map<string, Map<string, CourtAvailability[]>> = new Map();
+  for (const [date, slotsForDate] of groupedByDate) {
+    const groupedByTimeForDate = groupByTime(slotsForDate);
+    groupedByTime.set(date, groupedByTimeForDate);
+  }
+
+  return groupedByTime;
+}
+
 /**
  * We filter out slots: first by time range, then by open slots
  * and then we group the open slots by date and time
@@ -66,15 +77,7 @@ export function filterAndGroupSlots(
 ): Map<string, Map<string, CourtAvailability[]>> {
   const filteredSlots = filterByTimeRange(slots, startTime, endTime).filter((slot) => slot.isAvailable);
 
-  const groupedByDate = groupByDate(filteredSlots);
-
-  const groupedByTime: Map<string, Map<string, CourtAvailability[]>> = new Map();
-  for (const [date, slotsForDate] of groupedByDate) {
-    const groupedByTimeForDate = groupByTime(slotsForDate);
-    groupedByTime.set(date, groupedByTimeForDate);
-  }
-
-  return groupedByTime;
+  return groupSlotsByDateAndTime(filteredSlots);
 }
 
 /**
