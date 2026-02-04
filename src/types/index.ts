@@ -30,21 +30,8 @@ export enum Weekday {
   SUN = "sun",
 }
 
-export type ISODate = string;
-
-export interface MonitorWindow {
-  id: string;
-  chatId: string;
-  fromTime: string;
-  toTime: string;
-  description?: string;
-  /**
-   * Either dates or daysOfWeek must be provided.
-   */
-  dates?: ISODate[];
-  daysOfWeek?: Weekday[];
-  createdAt: string;
-  updatedAt: string;
-  active: boolean;
-  lastNotified?: Record<ISODate, string[]>;
+export interface Args {
+  from: string;
+  to: string;
+  days: Weekday[];
 }

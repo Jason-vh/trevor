@@ -1,12 +1,11 @@
+import { Bot } from "grammy";
+
 import type { CourtAvailability } from "@/types";
-import { sendTelegramMessage } from "@/telegram/bot";
+import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
 
-export function buildMessage(
-  groupedByDate: Map<string, Map<string, CourtAvailability[]>>,
-  heading = "Hello! I've found some newly available squash courts:",
-): string {
-  let message = `${heading}\n\n`;
+export function buildMessage(groupedByDate: Map<string, Map<string, CourtAvailability[]>>): string {
+  let message = "Hello! I've found some newly available squash courts:\n\n";
   for (const [date, slotsForDate] of groupedByDate) {
     message += `🗓️ *${date}*\n`;
 
@@ -20,13 +19,16 @@ export function buildMessage(
   return message;
 }
 
-export async function notify(chatId: string, groupedByDate: Map<string, Map<string, CourtAvailability[]>>, heading?: string) {
-  const message = buildMessage(groupedByDate, heading);
+export async function notify(message: string): Promise<void> {
+  const bot = new Bot(config.telegram.token);
 
   try {
-    await sendTelegramMessage(chatId, message, { parseMode: "Markdown" });
-    logger.info("Availability message sent to Telegram", { chatId, heading });
+    await bot.api.sendMessage(config.telegram.chatId, message, {
+      parse_mode: "Markdown",
+    });
+
+    logger.info("Message sent to Telegram", { message });
   } catch (error) {
-    logger.error("Failed to send availability message", { error, chatId });
+    logger.error("Failed to send Telegram message", { error, message });
   }
 }

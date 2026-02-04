@@ -1,86 +1,41 @@
-import type { Update } from "grammy/types";
-
-import { runAgent } from "@/agent";
-import { startMonitorScheduler } from "@/monitors/scheduler";
-import { bot, isAllowedChat } from "@/telegram/bot";
-import { config } from "@/utils/config";
+import { login } from "@/modules/auth";
+import { buildMessage, notify } from "@/modules/notify";
+import { filterAndGroupSlots, getAllSlotsOnDate } from "@/modules/slots";
+import { findChangedSlots, loadState, saveState } from "@/modules/state";
+import { getArgs } from "@/utils/args";
+import { getNextDays } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
 
-const webhookPath = `/telegram/${config.telegram.webhookSecret}`;
+async function main() {
+  const DAYS_TO_LOOK_AHEAD = 8;
 
-bot.catch((err) => {
-  logger.error("Telegram bot error", { error: err.error });
-});
+  const args = getArgs();
 
-bot.on("message", async (ctx) => {
-  const chatId = ctx.chat.id.toString();
+  const upcomingDays = getNextDays(DAYS_TO_LOOK_AHEAD).filter(({ day }) => args.days.includes(day));
+  logger.info("We're looking for availability on the following dates", { upcomingDays, ...args });
 
-  if (!isAllowedChat(chatId)) {
-    logger.warn("Received message from unauthorized chat", { chatId });
+  const session = await login();
+
+  const slotsPerDay = await Promise.all(upcomingDays.map(async ({ date }) => await getAllSlotsOnDate(session, date)));
+  const allSlots = slotsPerDay.flat();
+
+  const changedSlots = findChangedSlots(await loadState(), allSlots);
+  logger.info(`Found ${changedSlots.length} changed slots`, { changedSlots });
+
+  saveState(allSlots);
+
+  const groupedSlots = filterAndGroupSlots(changedSlots, args.from, args.to);
+
+  if (groupedSlots.size === 0) {
+    logger.info("Exiting - no useful slots found");
     return;
   }
 
-  const text = ctx.message?.text;
-
-  if (!text) {
-    await ctx.reply("Send me a text message so I know what to do.");
-    return;
-  }
-
-  await ctx.reply("Let me check that...");
-
-  try {
-    const response = await runAgent({
-      chatId,
-      message: text,
-      username: ctx.from?.username ?? ctx.from?.first_name,
-    });
-
-    await ctx.reply(response);
-  } catch (error) {
-    logger.error("Failed to respond to Telegram message", { chatId, error });
-    await ctx.reply("I ran into an issue, please try again shortly.");
-  }
-});
-
-async function handleWebhook(request: Request): Promise<Response> {
-  try {
-    const update = (await request.json()) as Update;
-    await bot.handleUpdate(update);
-    return new Response("ok");
-  } catch (error) {
-    logger.error("Failed to process Telegram webhook", { error });
-    return new Response("error", { status: 500 });
-  }
+  const message = buildMessage(groupedSlots);
+  notify(message);
 }
 
-function startServer() {
-  const server = Bun.serve({
-    port: config.server.port,
-    async fetch(request) {
-      const url = new URL(request.url);
-
-      if (url.pathname === "/healthz") {
-        return new Response("ok");
-      }
-
-      if (request.method === "POST" && url.pathname === webhookPath) {
-        return await handleWebhook(request);
-      }
-
-      return new Response("Not found", { status: 404 });
-    },
-  });
-
-  logger.info("Trevor server listening", { url: `http://localhost:${server.port}` });
-}
-
-async function bootstrap() {
-  startMonitorScheduler();
-  startServer();
-}
-
-bootstrap().catch((error) => {
-  logger.error("Failed to start Trevor", { error });
+main().catch((error) => {
+  logger.error(error);
   process.exit(1);
 });

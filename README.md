@@ -1,21 +1,19 @@
-# Trevor - The Squash Agent
+# Trevor - The Squash Bot
 
 <div align="center">
   <img src="trevor.png" alt="Trevor the Squash Bot" width="200">
 </div>
 
-Trevor is now a Bun-based web server that lives behind a Telegram webhook and answers in natural language. He can:
+Trevor monitors squash court availability at [SquashCity](https://squashcity.baanreserveren.nl/) and alerts you via Telegram when new slots appear.
 
-- 🔎 **Check availability on demand** – ask “Can we play next Wednesday evening?” and Trevor will scrape SquashCity for you.
-- ⏰ **Schedule monitors** – say “Ping us for Tuesday between 18:00-20:00” and Trevor stores a monitor that runs via cron.
-- 🤖 **Use AI to understand requests** – powered by [AI SDK](https://ai-sdk.dev/) + OpenAI.
-- 📟 **Log everything to Axiom** – existing logging pipeline still works in production.
+## What Trevor Does
 
-All state (monitors + last notifications) now lives in `data/monitors.json`. The old CLI + `data/state.json` flow is gone.
+- 🔍 **Monitors availability** - Checks schedules every 15 minutes (configurable)
+- 📱 **Smart notifications** - Only notifies when _new_ slots appear (no spam)
+- 🧠 **State tracking** - Remembers what was available last time to detect changes
+- 📊 **Optional logging** - Ships logs to Axiom for debugging
 
----
-
-## Getting Started
+## Quick Start
 
 1. **Install dependencies**
 
@@ -23,100 +21,100 @@ All state (monitors + last notifications) now lives in `data/monitors.json`. The
    bun install
    ```
 
-2. **Configure environment**
+2. **Configure credentials**
 
    ```bash
    cp .env.example .env.local
-   # edit .env.local with SquashCity creds, Telegram bot, OpenAI key, etc.
+   # Edit .env.local with your SquashCity credentials and Telegram bot token
    ```
 
-   Required variables:
-
-   | Name | Description |
-   | --- | --- |
-   | `SQUASH_CITY_USERNAME` / `SQUASH_CITY_PASSWORD` | Login used for scraping |
-   | `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather |
-   | `TELEGRAM_CHAT_ID` | Comma separated allowlist of chat/group ids Trevor may answer |
-   | `TELEGRAM_WEBHOOK_SECRET` | Random slug used in the webhook URL (`/telegram/<secret>`) |
-   | `OPENAI_API_KEY` | Key for GPT models via AI SDK |
-
-   Optional:
-
-   | Name | Default | Purpose |
-   | --- | --- | --- |
-   | `OPENAI_MODEL` | `gpt-4.1-mini` | Change assistant model |
-   | `PORT` | `3000` | Bun server port |
-   | `MONITOR_CRON` | `*/15 * * * *` | Cron expression for scheduled checks |
-   | `MONITOR_LOOKAHEAD_DAYS` | `7` | How far Trevor looks ahead for weekday monitors |
-   | `MONITOR_TIMEZONE` / `TZ` | system tz | Cron timezone |
-   | `AXIOM_TOKEN` / `AXIOM_DATASET` | – | Enable centralized logging |
-
-3. **Run the server**
+3. **Run once**
 
    ```bash
-   bun dev # or bun start
+   bun start --from 17:00 --to 18:00 --day tue --day wed
    ```
 
-4. **Wire up Telegram**
-
-   Set the webhook to point at your public URL plus the secret path:
-
+4. **Run continuously with PM2** _(recommended)_
    ```bash
-   curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
-     -d "url=https://your-domain.com/telegram/${TELEGRAM_WEBHOOK_SECRET}"
+   npm install -g pm2
+   pm2 start ecosystem.config.cjs
+   pm2 save && pm2 startup
    ```
 
-   Trevor also exposes `GET /healthz` for liveness checks.
+## Usage
 
----
+```bash
+bun start [options]
+```
 
-## Talking to Trevor
+**Options:**
 
-Examples of things Trevor understands:
+- `--from HH:MM` - Filter slots starting at or after this time
+- `--to HH:MM` - Filter slots ending at or before this time
+- `--day <day>` - Days to check (mon/tue/wed/thu/fri/sat/sun). Repeat for multiple: `--day tue --day wed`
 
-- “Are there any courts free tomorrow between 17:00 and 19:00?”
-- “Monitor next Tuesday evening and let me know if something opens up.”
-- “List the current monitors.”
+**Examples:**
 
-Behind the scenes the AI agent decides whether it should:
+```bash
+# Tuesday/Wednesday evenings
+bun start --from 17:00 --to 20:00 --day tue --day wed
 
-1. Call `checkAvailability` (scrapes immediately and formats a report).
-2. Call `createMonitor` (stores parameters in `data/monitors.json`).
-3. Call `listMonitors` (summarises what’s being watched).
+# Weekend mornings
+bun start --from 08:00 --to 12:00 --day sat --day sun
+```
 
-Every reply goes right back into the Telegram chat that triggered it (only chats listed in `TELEGRAM_CHAT_ID` are served).
+The bot checks the next 7 days and only sends Telegram notifications when availability _changes_ from the last run.
 
----
+## Environment Variables
 
-## Monitors & Scheduler
+Create a `.env.local` file:
 
-- Monitors live in `data/monitors.json` with structure `{ id, chatId, fromTime, toTime, daysOfWeek?, dates?, lastNotified }`.
-- The cron job (configured via `MONITOR_CRON`) logs into SquashCity, fetches the relevant days, and only sends a Telegram message when **new** slots appear compared to `lastNotified`.
-- After a monitor finishes all explicit dates it is automatically deactivated (weekday-based monitors keep running).
+```bash
+# Required: SquashCity login
+SQUASH_CITY_USERNAME=your_username
+SQUASH_CITY_PASSWORD=your_password
 
-To inspect/change monitors manually you can edit `data/monitors.json` while Trevor is offline, but prefer using the chat agent so the AI keeps descriptions consistent.
+# Required: Telegram notifications (get from @BotFather)
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
 
----
+# Optional: Axiom logging
+AXIOM_TOKEN=your_token
+AXIOM_DATASET=your_dataset
+```
 
-## Architecture
+## How It Works
 
-- **Runtime**: [Bun](https://bun.sh) server created via `Bun.serve`.
-- **Routing**: `POST /telegram/<secret>` webhook + `GET /healthz`.
-- **AI layer**: [AI SDK](https://ai-sdk.dev/) + `@ai-sdk/openai`, using tool calls to bridge to TypeScript functions.
-- **Scheduling**: [`croner`](https://github.com/Hexagon/croner) drives periodic checks.
-- **Scraping**: Existing Cheerio-based modules (`auth`, `scraper`, `parser`, `slots`) reused as-is.
-- **Logging**: `@axiomhq/logging` transports to console + Axiom when `NODE_ENV=production`.
+1. Logs into SquashCity with your credentials
+2. Scrapes court availability for the next 7 days
+3. Filters by your time/day preferences
+4. Compares with previous state (`data/state.json`)
+5. Sends Telegram alert if new slots appeared
+6. Saves current state for next run
 
----
+Uses lightweight scraping with `fetch` + Cheerio (no headless browser needed).
 
-## Development Tips
+## Tech Stack
 
-- The Telegram webhook expects a public URL. During local dev you can tunnel (e.g. `ngrok http 3000`) and point the webhook there.
-- If you edit `data/monitors.json` manually, restart the Bun process to ensure the scheduler reloads the file.
-- To reset Trevor, delete `data/monitors.json` (or replace with `[]`) and restart.
+- **[Bun](https://bun.sh)** - Fast TypeScript runtime
+- **[Grammy](https://grammy.dev)** - Telegram bot framework
+- **[Cheerio](https://cheerio.js.org)** - Server-side HTML parsing
+- **[Axiom](https://axiom.co)** - Optional logging
 
----
+## PM2 Configuration
+
+The included `ecosystem.config.cjs` runs Trevor every 15 minutes via cron:
+
+```javascript
+{
+  cron_restart: '*/15 * * * *',  // Every 15 minutes
+  args: '--from 17:25 --to 18:30 --day tue --day wed --day thu',
+  env: { TZ: 'Europe/Amsterdam' }
+}
+```
+
+Edit the file to customize your schedule and preferences.
 
 ## License
 
-Personal project. Scrape responsibly and keep load on SquashCity reasonable.
+Personal project. Use responsibly and be considerate of server load.
