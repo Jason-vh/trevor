@@ -200,15 +200,32 @@ AXIOM_DATASET=dataset_name        # Optional
 
 ## PM2 Deployment
 
-The `ecosystem.config.cjs` runs Trevor every 15 minutes via cron:
+The `ecosystem.config.cjs` runs Trevor every 5 minutes via cron:
 
 - Entry: `src/index.ts`
-- Cron: `*/15 * * * *`
-- Args: `--from 17:25 --to 18:30 --day tue --day wed --day thu`
+- Cron: `*/5 * * * *`
 - Timezone: `Europe/Amsterdam`
 - Auto-restart: `false` (exit after each run)
 
-Edit the file to customize schedule/preferences.
+Edit the file to customize schedule/preferences (days, time range).
+
+### Server Deployment
+
+Server: `ssh jasonvh@rigel.usbx.me`
+
+On the server, `pm2` must be run via `bunx` (node is not on PATH):
+
+```bash
+# Deploy latest changes
+git push
+ssh jasonvh@rigel.usbx.me "cd trevor && git pull && bunx pm2 restart trevor"
+
+# If PM2 process doesn't exist yet
+ssh jasonvh@rigel.usbx.me "cd trevor && bunx pm2 start ecosystem.config.cjs && bunx pm2 save"
+
+# Check logs
+ssh jasonvh@rigel.usbx.me "cd trevor && bunx pm2 logs trevor"
+```
 
 ## Website Specifics
 
