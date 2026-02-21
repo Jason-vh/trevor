@@ -2,17 +2,13 @@ import { SQUASH_CITY_URL } from "@/constants";
 import { getSlotsFromHTML } from "@/modules/parser";
 import { getPage } from "@/modules/scraper";
 import type { CourtAvailability, Session } from "@/types";
-import { getTimeInMinutes } from "@/utils/datetime";
+import { formatDateISO, getTimeInMinutes } from "@/utils/datetime";
 
 const SQUASH_SPORT_ID = 15;
 const RESERVATIONS_URL = `${SQUASH_CITY_URL}/reservations`;
 
-function getURL(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${RESERVATIONS_URL}/${year}-${month}-${day}/sport/${SQUASH_SPORT_ID}`;
+function getURL(dateISO: string): string {
+  return `${RESERVATIONS_URL}/${dateISO}/sport/${SQUASH_SPORT_ID}`;
 }
 
 export function filterByTimeRange(slots: CourtAvailability[], startTime: string, endTime: string) {
@@ -81,8 +77,9 @@ export function filterAndGroupSlots(
  * Fetch open slots that fall in a given time range, grouped by time
  */
 export async function getAllSlotsOnDate(session: Session, date: Date): Promise<CourtAvailability[]> {
-  const url = getURL(date);
+  const dateISO = formatDateISO(date);
+  const url = getURL(dateISO);
   const html = await getPage(url, session);
 
-  return getSlotsFromHTML(html);
+  return getSlotsFromHTML(html, dateISO);
 }

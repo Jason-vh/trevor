@@ -22,7 +22,7 @@ function parseCell(cellClass: string): Pick<CourtAvailability, "courtId" | "isAv
   };
 }
 
-export function getSlotsFromHTML(html: string): CourtAvailability[] {
+export function getSlotsFromHTML(html: string, dateISO: string): CourtAvailability[] {
   logger.info("Parsing reservations page");
 
   const $ = cheerio.load(html);
@@ -58,6 +58,7 @@ export function getSlotsFromHTML(html: string): CourtAvailability[] {
   $("tr[data-time]").each((_, row) => {
     const $row = $(row);
     const formattedStartTime = $row.attr("data-time");
+    const utc = $row.attr("utc") ?? "";
 
     if (!formattedStartTime) {
       throw new Error("Time not found for row");
@@ -87,6 +88,8 @@ export function getSlotsFromHTML(html: string): CourtAvailability[] {
         formattedStartTime,
         startTimeInMinutes,
         formattedDate,
+        dateISO,
+        utc,
       };
 
       slots.push(slot);

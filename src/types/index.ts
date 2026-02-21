@@ -14,6 +14,10 @@ export type CourtAvailability = {
   formattedStartTime: string;
   startTimeInMinutes: number;
   formattedDate: string;
+  dateISO: string;
+
+  // booking details
+  utc: string;
 
   // other details
   isAvailable: boolean;
@@ -34,4 +38,22 @@ export interface Args {
   from: string;
   to: string;
   days: Weekday[];
+  book: boolean;
 }
+
+export type BookedSlot = {
+  courtId: number;
+  utc: string;
+  courtName: string;
+  formattedStartTime: string;
+  dateISO: string;
+  formattedDate: string;
+  bookedAt: string;
+};
+
+export type BookingResult = {
+  success: boolean;
+  slot: CourtAvailability;
+  error?: string;
+  reservationId?: string;
+};

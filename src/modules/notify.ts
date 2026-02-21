@@ -1,6 +1,6 @@
 import { Bot } from "grammy";
 
-import type { CourtAvailability } from "@/types";
+import type { BookingResult, CourtAvailability } from "@/types";
 import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
 
@@ -16,6 +16,28 @@ export function buildMessage(groupedByDate: Map<string, Map<string, CourtAvailab
     message += "\n";
   }
 
+  return message;
+}
+
+export function buildBookingMessage(result: BookingResult): string {
+  const { slot } = result;
+
+  if (result.success) {
+    let message = `✅ *Court booked!*\n\n`;
+    message += `🏸 ${slot.courtName}\n`;
+    message += `🗓️ ${slot.formattedDate}\n`;
+    message += `🕐 ${slot.formattedStartTime}\n`;
+    if (result.reservationId) {
+      message += `\nReservation ID: ${result.reservationId}`;
+    }
+    return message;
+  }
+
+  let message = `❌ *Booking failed*\n\n`;
+  message += `🏸 ${slot.courtName}\n`;
+  message += `🗓️ ${slot.formattedDate}\n`;
+  message += `🕐 ${slot.formattedStartTime}\n`;
+  message += `\nError: ${result.error}`;
   return message;
 }
 

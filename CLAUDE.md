@@ -4,13 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project: Trevor - Squash Court Monitor
 
-Automated notification system that monitors court availability at SquashCity (https://squashcity.baanreserveren.nl/) and sends Telegram alerts when **new** slots appear. Uses state tracking to avoid spam.
+Automated system that monitors court availability at SquashCity (https://squashcity.baanreserveren.nl/), sends Telegram alerts when **new** slots appear, and optionally **auto-books** the earliest available court. Uses state tracking to avoid spam and duplicate bookings.
 
 ## Essential Commands
 
 ```bash
-# Run once
+# Run once (notify only)
 bun start --from 17:00 --to 18:00 --day tue --day wed
+
+# Run once (auto-book)
+bun start --from 17:00 --to 18:00 --day tue --day wed --book
 
 # Development with auto-reload
 bun run dev
@@ -29,10 +32,11 @@ pm2 logs trevor
 
 ```
 1. Auth     → Login, extract session cookies
-2. Scraper  → Inject cookies, fetch HTML pages
+2. Scraper  → Inject cookies, fetch/post HTML pages
 3. Parser   → Cheerio extracts availability from HTML
 4. State    → Compare with previous state, find changes
-5. Notify   → Send Telegram message for new slots only
+5. Booking  → (optional) Auto-book earliest available slot
+6. Notify   → Send Telegram message for new slots / bookings
 ```
 
 ### Why This Approach?
@@ -72,8 +76,9 @@ Handles login flow:
 
 HTTP wrapper that injects session cookies:
 
+- `getPage()` - GET requests with session cookies
+- `postPage()` - POST requests with session cookies, CSRF referer/origin headers
 - Strips cookie metadata (takes only name=value before `;`)
-- Joins cookies with `; ` separator
 - Sets User-Agent to avoid bot detection
 
 ### src/modules/parser.ts
@@ -81,9 +86,10 @@ HTTP wrapper that injects session cookies:
 Cheerio-based HTML parser:
 
 - Extracts court names from `<thead> th.header-name` (text) and court IDs from class `r-(\d+)`
-- Parses time slots from `<tr data-time="HH:MM">`
+- Parses time slots from `<tr data-time="HH:MM">` and UTC timestamps from `utc` attribute
 - Identifies availability via `td.slot.free` vs `td.slot.taken`
 - Detects off-peak pricing via `.off-peak` class
+- Accepts `dateISO` parameter to attach date context to each slot
 - Returns array of `CourtAvailability` objects
 
 ### src/modules/slots.ts
@@ -98,28 +104,40 @@ Business logic for filtering/grouping:
 
 Persistence layer:
 
-- `saveState()` - Writes all slots to `data/state.json`
-- `loadState()` - Reads previous state from JSON
+- `saveState()` / `loadState()` - Persists all slots to `data/state.json`
 - `findChangedSlots()` - Compares slots by courtId + time + date + availability, returns delta
+- `saveBookedSlot()` / `loadBookedSlots()` - Tracks booked slots in `data/booked.json`
+- `cleanupBookedSlots()` - Removes past booked slots on each run
+
+### src/modules/booking.ts
+
+Auto-booking engine (3-step form flow):
+
+1. GET booking form → extract hidden fields + CSRF token
+2. POST to `/reservations/confirm` → get confirmation page
+3. POST with `confirmed=1` → finalize booking
+- `getCandidateSlots()` - Filters available slots not already booked, sorted by earliest
+- `bookSlot()` - Executes the 3-step booking flow
+- Uses a hardcoded booking partner ID for the second player
 
 ### src/modules/notify.ts
 
 Telegram integration via Grammy:
 
-- `buildMessage()` - Formats slots as Markdown (groups by date, then time)
+- `buildMessage()` - Formats changed slots as Markdown (groups by date, then time)
+- `buildBookingMessage()` - Formats booking confirmations/failures
 - `notify()` - Sends message to configured chat ID
 
 ### src/index.ts (Entry Point)
 
 Main orchestration:
 
-1. Parse CLI args (`--from`, `--to`, `--day` flags)
+1. Parse CLI args (`--from`, `--to`, `--day`, `--book` flags)
 2. Filter next 7 days by requested weekdays
-3. Login and fetch slots for each day in parallel
-4. Compare with previous state
-5. Exit early if no changes
-6. Build and send Telegram notification
-7. Save new state
+3. Login and fetch slots for each day sequentially (with error handling per day)
+4. Compare with previous state, save new state
+5. If `--book`: clean up past bookings, find candidates, attempt booking, notify on result
+6. Build and send Telegram notification for changed slots (if any)
 
 ## Critical Implementation Details
 
@@ -198,7 +216,28 @@ AXIOM_TOKEN=axiom_token          # Optional
 AXIOM_DATASET=dataset_name        # Optional
 ```
 
-## PM2 Deployment
+## Deployment
+
+### Railway (primary)
+
+Deployed on Railway with cron-based scheduling. Config in `railway.json`:
+
+- Builder: Nixpacks
+- Start command: `bun run src/index.ts --from 18:00 --to 19:00 --day tue --day wed --book`
+- Region: `europe-west4`
+- Restart policy: never (exit after each run)
+
+**CI/CD**: Pushes to `main` auto-deploy via GitHub Actions (`.github/workflows/deploy.yml`). Uses `RAILWAY_TOKEN` secret for authentication.
+
+```bash
+# Manual deploy
+railway up --service trevor
+
+# Check logs
+railway logs --service trevor
+```
+
+### PM2 (legacy)
 
 The `ecosystem.config.cjs` runs Trevor every 5 minutes via cron:
 
@@ -206,26 +245,6 @@ The `ecosystem.config.cjs` runs Trevor every 5 minutes via cron:
 - Cron: `*/5 * * * *`
 - Timezone: `Europe/Amsterdam`
 - Auto-restart: `false` (exit after each run)
-
-Edit the file to customize schedule/preferences (days, time range).
-
-### Server Deployment
-
-Server: `ssh jasonvh@rigel.usbx.me`
-
-On the server, `pm2` must be run via `bunx` (node is not on PATH):
-
-```bash
-# Deploy latest changes
-git push
-ssh jasonvh@rigel.usbx.me "cd trevor && git pull && bunx pm2 restart trevor"
-
-# If PM2 process doesn't exist yet
-ssh jasonvh@rigel.usbx.me "cd trevor && bunx pm2 start ecosystem.config.cjs && bunx pm2 save"
-
-# Check logs
-ssh jasonvh@rigel.usbx.me "cd trevor && bunx pm2 logs trevor"
-```
 
 ## Website Specifics
 
@@ -235,6 +254,8 @@ ssh jasonvh@rigel.usbx.me "cd trevor && bunx pm2 logs trevor"
 
 - `/auth/login` - POST with `username` and `password` form fields
 - `/reservations/{YYYY-MM-DD}/sport/{sportId}` - GET schedule (sportId 15 = squash)
+- `/reservations/make/{courtId}/{utc}` - GET booking form
+- `/reservations/confirm` - POST to confirm/finalize booking
 
 **Authentication**: Cookie-based sessions. Login returns 302 redirect with Set-Cookie headers.
 

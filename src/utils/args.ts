@@ -25,6 +25,10 @@ export function getArgs() {
         type: "string",
         multiple: true,
       },
+      book: {
+        type: "boolean",
+        default: false,
+      },
     },
     strict: true,
     allowPositionals: true,
@@ -63,5 +67,6 @@ export function getArgs() {
     from: values.from,
     to: values.to,
     days,
+    book: values.book ?? false,
   };
 }

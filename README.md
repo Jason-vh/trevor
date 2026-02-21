@@ -4,12 +4,13 @@
   <img src="trevor.png" alt="Trevor the Squash Bot" width="200">
 </div>
 
-Trevor monitors squash court availability at [SquashCity](https://squashcity.baanreserveren.nl/) and alerts you via Telegram when new slots appear.
+Trevor monitors squash court availability at [SquashCity](https://squashcity.baanreserveren.nl/), alerts you via Telegram when new slots appear, and can automatically book courts for you.
 
 ## What Trevor Does
 
-- 🔍 **Monitors availability** - Checks schedules every 15 minutes (configurable)
+- 🔍 **Monitors availability** - Checks schedules on a cron (configurable)
 - 📱 **Smart notifications** - Only notifies when _new_ slots appear (no spam)
+- 🤖 **Auto-booking** - Optionally books the earliest available court with `--book`
 - 🧠 **State tracking** - Remembers what was available last time to detect changes
 - 📊 **Optional logging** - Ships logs to Axiom for debugging
 
@@ -31,7 +32,11 @@ Trevor monitors squash court availability at [SquashCity](https://squashcity.baa
 3. **Run once**
 
    ```bash
+   # Notify only
    bun start --from 17:00 --to 18:00 --day tue --day wed
+
+   # Auto-book earliest available slot
+   bun start --from 17:00 --to 18:00 --day tue --day wed --book
    ```
 
 4. **Run continuously with PM2** _(recommended)_
@@ -52,6 +57,7 @@ bun start [options]
 - `--from HH:MM` - Filter slots starting at or after this time
 - `--to HH:MM` - Filter slots ending at or before this time
 - `--day <day>` - Days to check (mon/tue/wed/thu/fri/sat/sun). Repeat for multiple: `--day tue --day wed`
+- `--book` - Auto-book the earliest available slot in the time range
 
 **Examples:**
 
@@ -89,8 +95,9 @@ AXIOM_DATASET=your_dataset
 2. Scrapes court availability for the next 7 days
 3. Filters by your time/day preferences
 4. Compares with previous state (`data/state.json`)
-5. Sends Telegram alert if new slots appeared
-6. Saves current state for next run
+5. If `--book`: auto-books the earliest available court and sends confirmation
+6. Sends Telegram alert if new slots appeared
+7. Saves current state for next run
 
 Uses lightweight scraping with `fetch` + Cheerio (no headless browser needed).
 
@@ -101,9 +108,15 @@ Uses lightweight scraping with `fetch` + Cheerio (no headless browser needed).
 - **[Cheerio](https://cheerio.js.org)** - Server-side HTML parsing
 - **[Axiom](https://axiom.co)** - Optional logging
 
-## PM2 Configuration
+## Deployment
 
-The included `ecosystem.config.cjs` runs Trevor every 15 minutes via cron:
+### Railway (recommended)
+
+Deployed on [Railway](https://railway.com) with cron-based scheduling. Pushes to `main` auto-deploy via GitHub Actions.
+
+### PM2 (alternative)
+
+The included `ecosystem.config.cjs` runs Trevor via cron:
 
 ```javascript
 {
