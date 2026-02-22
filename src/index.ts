@@ -39,7 +39,7 @@ async function main() {
     const bookedSlots = await loadBookedSlots();
 
     const availableSlots = filterByTimeRange(allSlots, args.from, args.to);
-    const candidates = getCandidateSlots(availableSlots, bookedSlots);
+    const candidates = getCandidateSlots(availableSlots, bookedSlots, args.from, args.to);
 
     logger.info(`Found ${candidates.length} booking candidates`);
 
