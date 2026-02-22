@@ -12,13 +12,13 @@ const RESERVATIONS_URL = `${SQUASH_CITY_URL}/reservations`;
 
 /**
  * Returns available slots sorted by earliest date then earliest time,
- * excluding slots already booked in this session.
+ * excluding days that already have a booking.
  */
 export function getCandidateSlots(slots: CourtAvailability[], bookedSlots: BookedSlot[]): CourtAvailability[] {
-  const bookedKeys = new Set(bookedSlots.map((b) => `${b.courtId}:${b.utc}`));
+  const bookedDates = new Set(bookedSlots.map((b) => b.dateISO));
 
   return slots
-    .filter((slot) => slot.isAvailable && !bookedKeys.has(`${slot.courtId}:${slot.utc}`))
+    .filter((slot) => slot.isAvailable && !bookedDates.has(slot.dateISO))
     .sort((a, b) => {
       if (a.dateISO !== b.dateISO) return a.dateISO.localeCompare(b.dateISO);
       return a.startTimeInMinutes - b.startTimeInMinutes;
