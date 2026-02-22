@@ -1,12 +1,12 @@
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { rename } from "node:fs/promises";
 
 import type { BookedSlot, CourtAvailability } from "@/types";
 import { logger } from "@/utils/logger";
 
-const STATE_FILE_PATH = join(process.cwd(), "data", "state.json");
-const BOOKED_FILE_PATH = join(process.cwd(), "data", "booked.json");
+const DATA_DIR = join(process.cwd(), "data");
+const STATE_FILE_PATH = join(DATA_DIR, "state.json");
+const BOOKED_FILE_PATH = join(DATA_DIR, "booked.json");
 
 export function saveState(slots: CourtAvailability[]): void {
   logger.info(`Saving ${slots.length} slots to state`);
@@ -55,7 +55,7 @@ export async function saveBookedSlot(slot: BookedSlot): Promise<void> {
   const existing = await loadBookedSlots();
   existing.push(slot);
 
-  const tmpPath = join(tmpdir(), `booked-${Date.now()}.json`);
+  const tmpPath = join(DATA_DIR, `booked-${Date.now()}.tmp.json`);
   await Bun.write(tmpPath, JSON.stringify(existing, null, 2));
   await rename(tmpPath, BOOKED_FILE_PATH);
 
@@ -69,7 +69,7 @@ export async function cleanupBookedSlots(): Promise<void> {
 
   if (filtered.length !== slots.length) {
     logger.info(`Cleaning up ${slots.length - filtered.length} past booked slots`);
-    const tmpPath = join(tmpdir(), `booked-${Date.now()}.json`);
+    const tmpPath = join(DATA_DIR, `booked-${Date.now()}.tmp.json`);
     await Bun.write(tmpPath, JSON.stringify(filtered, null, 2));
     await rename(tmpPath, BOOKED_FILE_PATH);
   }
