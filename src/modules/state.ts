@@ -38,4 +38,3 @@ export function findChangedSlots(oldSlots: CourtAvailability[], newSlots: CourtA
     return oldSlot === undefined;
   });
 }
-

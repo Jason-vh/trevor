@@ -6,11 +6,16 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun --watch src/index.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "fmt": "oxfmt --write src",
+    "fmt:check": "oxfmt --check src",
+    "lint": "oxlint src"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "prettier": "^3.6.2"
+    "lefthook": "^2.1.1",
+    "oxfmt": "^0.35.0",
+    "oxlint": "^1.50.0"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

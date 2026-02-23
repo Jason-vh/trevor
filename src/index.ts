@@ -41,7 +41,9 @@ async function main() {
 
     if (candidates.length > 0) {
       for (const candidate of candidates) {
-        logger.info(`Attempting to book: ${candidate.courtName} on ${candidate.formattedDate} at ${candidate.formattedStartTime}`);
+        logger.info(
+          `Attempting to book: ${candidate.courtName} on ${candidate.formattedDate} at ${candidate.formattedStartTime}`,
+        );
 
         const result = await bookSlot(candidate, session);
 

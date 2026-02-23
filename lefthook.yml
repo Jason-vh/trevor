@@ -1,0 +1,7 @@
+pre-commit:
+  parallel: true
+  commands:
+    fmt-check:
+      run: bunx oxfmt --check src
+    lint:
+      run: bunx oxlint src

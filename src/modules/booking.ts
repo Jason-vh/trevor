@@ -16,11 +16,7 @@ const RESERVATIONS_URL = `${SQUASH_CITY_URL}/reservations`;
  * excluding dates that already have an own booking within the given time block.
  * Own bookings are detected directly from the HTML via the `self` CSS class.
  */
-export function getCandidateSlots(
-  slots: CourtAvailability[],
-  from: string,
-  to: string,
-): CourtAvailability[] {
+export function getCandidateSlots(slots: CourtAvailability[], from: string, to: string): CourtAvailability[] {
   const fromMinutes = getTimeInMinutes(from);
   const toMinutes = getTimeInMinutes(to);
 
