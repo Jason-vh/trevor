@@ -6,6 +6,7 @@
   "deploy": {
     "startCommand": "bun run src/index.ts --from 18:30 --to 19:00 --day tue --day wed --book",
     "restartPolicyType": "NEVER",
-    "region": "europe-west4"
+    "region": "europe-west4",
+    "cronSchedule": "*/5 * * * *"
   }
 }
