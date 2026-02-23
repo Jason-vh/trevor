@@ -21,6 +21,7 @@ export type CourtAvailability = {
 
   // other details
   isAvailable: boolean;
+  isOwnBooking: boolean;
   offPeak: boolean;
 };
 
@@ -40,16 +41,6 @@ export interface Args {
   days: Weekday[];
   book: boolean;
 }
-
-export type BookedSlot = {
-  courtId: number;
-  utc: string;
-  courtName: string;
-  formattedStartTime: string;
-  dateISO: string;
-  formattedDate: string;
-  bookedAt: string;
-};
 
 export type BookingResult = {
   success: boolean;

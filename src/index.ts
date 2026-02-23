@@ -2,8 +2,7 @@ import { login } from "@/modules/auth";
 import { bookSlot, getCandidateSlots } from "@/modules/booking";
 import { buildBookingMessage, buildMessage, notify } from "@/modules/notify";
 import { filterAndGroupSlots, filterByTimeRange, getAllSlotsOnDate } from "@/modules/slots";
-import { cleanupBookedSlots, findChangedSlots, loadBookedSlots, loadState, saveBookedSlot, saveState } from "@/modules/state";
-import type { BookedSlot } from "@/types";
+import { findChangedSlots, loadState, saveState } from "@/modules/state";
 import { getArgs } from "@/utils/args";
 import { getNextDays } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
@@ -35,11 +34,8 @@ async function main() {
 
   // Auto-booking flow
   if (args.book) {
-    await cleanupBookedSlots();
-    const bookedSlots = await loadBookedSlots();
-
     const availableSlots = filterByTimeRange(allSlots, args.from, args.to);
-    const candidates = getCandidateSlots(availableSlots, bookedSlots, args.from, args.to);
+    const candidates = getCandidateSlots(availableSlots, args.from, args.to);
 
     logger.info(`Found ${candidates.length} booking candidates`);
 
@@ -50,17 +46,6 @@ async function main() {
         const result = await bookSlot(candidate, session);
 
         if (result.success) {
-          const bookedSlot: BookedSlot = {
-            courtId: candidate.courtId,
-            utc: candidate.utc,
-            courtName: candidate.courtName,
-            formattedStartTime: candidate.formattedStartTime,
-            dateISO: candidate.dateISO,
-            formattedDate: candidate.formattedDate,
-            bookedAt: new Date().toISOString(),
-          };
-          await saveBookedSlot(bookedSlot);
-
           const message = buildBookingMessage(result);
           logger.info("Booking notification", { message });
           await notify(message);
@@ -70,9 +55,11 @@ async function main() {
         logger.warn(`Booking failed for ${candidate.courtName}: ${result.error}, trying next candidate`);
       }
     }
+
+    return;
   }
 
-  // Existing notification flow for changed slots
+  // Notification flow for changed slots (only when not in booking mode)
   const groupedSlots = filterAndGroupSlots(changedSlots, args.from, args.to);
 
   if (groupedSlots.size === 0) {

@@ -2,7 +2,7 @@ import * as cheerio from "cheerio";
 
 import { SQUASH_CITY_URL } from "@/constants";
 import { getPage, postPage } from "@/modules/scraper";
-import type { BookedSlot, BookingResult, CourtAvailability, Session } from "@/types";
+import type { BookingResult, CourtAvailability, Session } from "@/types";
 import { getTimeInMinutes } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
 
@@ -13,26 +13,27 @@ const RESERVATIONS_URL = `${SQUASH_CITY_URL}/reservations`;
 
 /**
  * Returns available slots sorted by earliest date then earliest time,
- * excluding dates that already have a booking within the given time block.
+ * excluding dates that already have an own booking within the given time block.
+ * Own bookings are detected directly from the HTML via the `self` CSS class.
  */
 export function getCandidateSlots(
   slots: CourtAvailability[],
-  bookedSlots: BookedSlot[],
   from: string,
   to: string,
 ): CourtAvailability[] {
   const fromMinutes = getTimeInMinutes(from);
   const toMinutes = getTimeInMinutes(to);
 
-  // Only consider booked slots that fall within the requested time block
+  // Dates where we already have a booking within the requested time block
   const bookedDatesInBlock = new Set(
-    bookedSlots
-      .filter((b) => {
-        const bookedMinutes = getTimeInMinutes(b.formattedStartTime);
-        return bookedMinutes >= fromMinutes && bookedMinutes <= toMinutes;
-      })
-      .map((b) => b.dateISO),
+    slots
+      .filter((s) => s.isOwnBooking && s.startTimeInMinutes >= fromMinutes && s.startTimeInMinutes <= toMinutes)
+      .map((s) => s.dateISO),
   );
+
+  if (bookedDatesInBlock.size > 0) {
+    logger.info("Skipping dates with existing own bookings", { dates: [...bookedDatesInBlock] });
+  }
 
   return slots
     .filter((slot) => slot.isAvailable && !bookedDatesInBlock.has(slot.dateISO))

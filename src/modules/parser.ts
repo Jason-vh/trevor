@@ -6,8 +6,9 @@ import { logger } from "@/utils/logger";
 
 const COURT_ID_REGEX = /r-(\d+)/;
 
-function parseCell(cellClass: string): Pick<CourtAvailability, "courtId" | "isAvailable" | "offPeak"> {
+function parseCell(cellClass: string): Pick<CourtAvailability, "courtId" | "isAvailable" | "isOwnBooking" | "offPeak"> {
   const isAvailable = cellClass.includes("free");
+  const isOwnBooking = cellClass.includes("self");
   const offPeak = cellClass.includes("off-peak");
   const courtId = cellClass.match(COURT_ID_REGEX)?.[1];
 
@@ -18,6 +19,7 @@ function parseCell(cellClass: string): Pick<CourtAvailability, "courtId" | "isAv
   return {
     courtId: parseInt(courtId),
     isAvailable,
+    isOwnBooking,
     offPeak,
   };
 }
@@ -73,7 +75,7 @@ export function getSlotsFromHTML(html: string, dateISO: string): CourtAvailabili
       if (!cellClass || cellClass.includes("closed")) {
         return;
       }
-      const { courtId, isAvailable, offPeak } = parseCell(cellClass);
+      const { courtId, isAvailable, isOwnBooking, offPeak } = parseCell(cellClass);
 
       const courtName = courts.get(courtId);
       if (!courtName) {
@@ -84,6 +86,7 @@ export function getSlotsFromHTML(html: string, dateISO: string): CourtAvailabili
         courtId,
         courtName,
         isAvailable,
+        isOwnBooking,
         offPeak,
         formattedStartTime,
         startTimeInMinutes,
