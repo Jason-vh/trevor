@@ -8,11 +8,6 @@ export interface Config {
     token: string;
     chatId: string;
   };
-
-  axiom: {
-    token?: string;
-    dataset?: string;
-  };
 }
 
 if (!Bun.env.SQUASH_CITY_USERNAME || !Bun.env.SQUASH_CITY_PASSWORD) {
@@ -31,9 +26,5 @@ export const config: Config = {
   telegram: {
     token: Bun.env.TELEGRAM_BOT_TOKEN,
     chatId: Bun.env.TELEGRAM_CHAT_ID,
-  },
-  axiom: {
-    token: Bun.env.AXIOM_TOKEN,
-    dataset: Bun.env.AXIOM_DATASET,
   },
 };

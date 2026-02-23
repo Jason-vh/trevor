@@ -1,29 +1,18 @@
-import { Axiom } from "@axiomhq/js";
-import { AxiomJSTransport, ConsoleTransport, Logger, type Transport } from "@axiomhq/logging";
-import { config } from "./config";
+type LogLevel = "info" | "warn" | "error" | "debug";
 
-const transports: [Transport, ...Transport[]] = [
-  new ConsoleTransport({
-    prettyPrint: true,
-    logLevel: "debug",
-  }),
-];
-
-if (Bun.env.NODE_ENV === "production" && config.axiom.token && config.axiom.dataset) {
-  console.log("Logging to Axiom dataset", config.axiom.dataset);
-
-  const axiom = new Axiom({
-    token: config.axiom.token,
-  });
-
-  transports.push(
-    new AxiomJSTransport({
-      axiom,
-      dataset: config.axiom.dataset,
-    }),
-  );
+function log(level: LogLevel, message: unknown, fields?: Record<string, unknown>) {
+  const entry = {
+    level,
+    message,
+    timestamp: new Date().toISOString(),
+    ...fields,
+  };
+  console.log(JSON.stringify(entry));
 }
 
-export const logger = new Logger({
-  transports,
-});
+export const logger = {
+  info: (message: unknown, fields?: Record<string, unknown>) => log("info", message, fields),
+  warn: (message: unknown, fields?: Record<string, unknown>) => log("warn", message, fields),
+  error: (message: unknown, fields?: Record<string, unknown>) => log("error", message, fields),
+  debug: (message: unknown, fields?: Record<string, unknown>) => log("debug", message, fields),
+};

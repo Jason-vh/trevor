@@ -52,12 +52,9 @@ The target website uses **server-side rendered HTML** (not a SPA), so:
 
 **State Tracking**: JSON file (`data/state.json`) persists all slot states between runs. The `findChangedSlots()` function (src/modules/state.ts:22) compares old vs new states by courtId, time, date, and availability to detect changes. Only changed slots trigger notifications.
 
-**Configuration**: All config in src/utils/config.ts loads from environment variables (`.env.local`). Required: `SQUASH_CITY_USERNAME`, `SQUASH_CITY_PASSWORD`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. Optional: `AXIOM_TOKEN`, `AXIOM_DATASET`.
+**Configuration**: All config in src/utils/config.ts loads from environment variables (`.env.local`). Required: `SQUASH_CITY_USERNAME`, `SQUASH_CITY_PASSWORD`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 
-**Logging**: Axiom-based structured logger (src/utils/logger.ts) with dual transports:
-
-- Console (always, pretty-printed)
-- Axiom remote logging (optional, only when `NODE_ENV=production` AND token/dataset configured)
+**Logging**: Minimal JSON structured logger (src/utils/logger.ts). Outputs single-line JSON with `level`, `message`, `timestamp`, and optional custom fields. Integrates with Railway's log filtering/querying.
 
 **Path Aliases**: TypeScript paths use `@/*` → `./src/*` (tsconfig.json:10)
 
@@ -212,8 +209,6 @@ SQUASH_CITY_USERNAME=your_username
 SQUASH_CITY_PASSWORD=your_password
 TELEGRAM_BOT_TOKEN=bot_token_from_botfather
 TELEGRAM_CHAT_ID=your_chat_id
-AXIOM_TOKEN=axiom_token          # Optional
-AXIOM_DATASET=dataset_name        # Optional
 ```
 
 ## Deployment

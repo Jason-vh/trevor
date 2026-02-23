@@ -12,7 +12,7 @@ Trevor monitors squash court availability at [SquashCity](https://squashcity.baa
 - 📱 **Smart notifications** - Only notifies when _new_ slots appear (no spam)
 - 🤖 **Auto-booking** - Optionally books the earliest available court with `--book`
 - 🧠 **State tracking** - Remembers what was available last time to detect changes
-- 📊 **Optional logging** - Ships logs to Axiom for debugging
+- 📊 **Structured logging** - JSON logs with timestamps for Railway
 
 ## Quick Start
 
@@ -83,10 +83,6 @@ SQUASH_CITY_PASSWORD=your_password
 # Required: Telegram notifications (get from @BotFather)
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
-
-# Optional: Axiom logging
-AXIOM_TOKEN=your_token
-AXIOM_DATASET=your_dataset
 ```
 
 ## How It Works
@@ -106,7 +102,6 @@ Uses lightweight scraping with `fetch` + Cheerio (no headless browser needed).
 - **[Bun](https://bun.sh)** - Fast TypeScript runtime
 - **[Grammy](https://grammy.dev)** - Telegram bot framework
 - **[Cheerio](https://cheerio.js.org)** - Server-side HTML parsing
-- **[Axiom](https://axiom.co)** - Optional logging
 
 ## Deployment
 
