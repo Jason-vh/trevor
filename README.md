@@ -39,13 +39,6 @@ Trevor monitors squash court availability at [SquashCity](https://squashcity.baa
    bun start --from 17:00 --to 18:00 --day tue --day wed --book
    ```
 
-4. **Run continuously with PM2** _(recommended)_
-   ```bash
-   npm install -g pm2
-   pm2 start ecosystem.config.cjs
-   pm2 save && pm2 startup
-   ```
-
 ## Usage
 
 ```bash
@@ -108,20 +101,6 @@ Uses lightweight scraping with `fetch` + Cheerio (no headless browser needed).
 ### Railway (recommended)
 
 Deployed on [Railway](https://railway.com) with cron-based scheduling. Pushes to `main` auto-deploy via GitHub Actions.
-
-### PM2 (alternative)
-
-The included `ecosystem.config.cjs` runs Trevor via cron:
-
-```javascript
-{
-  cron_restart: '*/15 * * * *',  // Every 15 minutes
-  args: '--from 17:25 --to 18:30 --day tue --day wed --day thu',
-  env: { TZ: 'Europe/Amsterdam' }
-}
-```
-
-Edit the file to customize your schedule and preferences.
 
 ## License
 

@@ -20,10 +20,6 @@ bun run dev
 
 # Run tests
 bun test
-
-# Run with PM2 (cron-based)
-pm2 start ecosystem.config.cjs
-pm2 logs trevor
 ```
 
 ## Architecture Overview
@@ -231,15 +227,6 @@ railway up --service trevor
 # Check logs
 railway logs --service trevor
 ```
-
-### PM2 (legacy)
-
-The `ecosystem.config.cjs` runs Trevor every 5 minutes via cron:
-
-- Entry: `src/index.ts`
-- Cron: `*/5 * * * *`
-- Timezone: `Europe/Amsterdam`
-- Auto-restart: `false` (exit after each run)
 
 ## Website Specifics
 
