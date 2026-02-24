@@ -4,15 +4,16 @@
   <img src="trevor.png" alt="Trevor the Squash Bot" width="200">
 </div>
 
-Trevor monitors squash court availability at [SquashCity](https://squashcity.baanreserveren.nl/), alerts you via Telegram when new slots appear, and can automatically book courts for you.
+Trevor is a conversational AI chatbot for booking squash courts at [SquashCity](https://squashcity.baanreserveren.nl/). Send him a message like "book me a court next Tuesday at 18:30" and he'll check availability, confirm, and book. If nothing is available, he queues the request and retries every 5 minutes.
 
 ## What Trevor Does
 
-- 🔍 **Monitors availability** - Checks schedules on a cron (configurable)
-- 📱 **Smart notifications** - Only notifies when _new_ slots appear (no spam)
-- 🤖 **Auto-booking** - Optionally books the earliest available court with `--book`
-- 🧠 **State tracking** - Remembers what was available last time to detect changes
-- 📊 **Structured logging** - JSON logs with timestamps for Railway
+- 💬 **Conversational booking** - Chat naturally in Dutch or English via Telegram
+- 🔍 **Check availability** - Ask what courts are free for any date/time
+- 🤖 **Auto-booking** - Confirms before booking, handles the full 3-step flow
+- 📋 **Booking queue** - Watches for slots and books automatically when one opens up
+- 📅 **View reservations** - Shows your upcoming bookings
+- 🧠 **Conversation memory** - Remembers context across messages (persisted in Postgres)
 
 ## Quick Start
 
@@ -26,43 +27,26 @@ Trevor monitors squash court availability at [SquashCity](https://squashcity.baa
 
    ```bash
    cp .env.example .env.local
-   # Edit .env.local with your SquashCity credentials and Telegram bot token
+   # Edit .env.local with your credentials
    ```
 
-3. **Run once**
+3. **Set up database**
 
    ```bash
-   # Notify only
-   bun start --from 17:00 --to 18:00 --day tue --day wed
+   # Create a local Postgres database
+   createdb trevor
 
-   # Auto-book earliest available slot
-   bun start --from 17:00 --to 18:00 --day tue --day wed --book
+   # Run migrations
+   bun run db:migrate
    ```
 
-## Usage
+4. **Start the bot**
 
-```bash
-bun start [options]
-```
+   ```bash
+   bun start
+   ```
 
-**Options:**
-
-- `--from HH:MM` - Filter slots starting at or after this time
-- `--to HH:MM` - Filter slots ending at or before this time
-- `--day <day>` - Days to check (mon/tue/wed/thu/fri/sat/sun). Repeat for multiple: `--day tue --day wed`
-- `--book` - Auto-book the earliest available slot in the time range
-
-**Examples:**
-
-```bash
-# Tuesday/Wednesday evenings
-bun start --from 17:00 --to 20:00 --day tue --day wed
-
-# Weekend mornings
-bun start --from 08:00 --to 12:00 --day sat --day sun
-```
-
-The bot checks the next 7 days and only sends Telegram notifications when availability _changes_ from the last run.
+   Trevor starts in long-polling mode locally (no public URL needed).
 
 ## Environment Variables
 
@@ -73,34 +57,63 @@ Create a `.env.local` file:
 SQUASH_CITY_USERNAME=your_username
 SQUASH_CITY_PASSWORD=your_password
 
-# Required: Telegram notifications (get from @BotFather)
+# Required: Telegram bot (get from @BotFather)
+# Use separate bot tokens for dev vs prod
 TELEGRAM_BOT_TOKEN=your_bot_token
-TELEGRAM_CHAT_ID=your_chat_id
+TELEGRAM_CHAT_ID=your_chat_id          # comma-separated for multiple chats
+
+# Required: Claude API key
+ANTHROPIC_API_KEY=sk-ant-your_key_here
+
+# Required: Postgres connection
+DATABASE_URL=postgresql://user:password@localhost:5432/trevor
+
+# Production only (omit for local dev to use polling):
+# WEBHOOK_DOMAIN=your-app.up.railway.app
+# WEBHOOK_SECRET=random_secret_string
 ```
 
 ## How It Works
 
-1. Logs into SquashCity with your credentials
-2. Scrapes court availability for the next 7 days
-3. Filters by your time/day preferences
-4. Compares with previous state (`data/state.json`)
-5. If `--book`: auto-books the earliest available court and sends confirmation
-6. Sends Telegram alert if new slots appeared
-7. Saves current state for next run
+```
+User message → Telegram → Grammy bot → pi-agent-core Agent → tool calls → response
+```
 
-Uses lightweight scraping with `fetch` + Cheerio (no headless browser needed).
+1. User sends a message (DM or @mention in a group)
+2. Conversation history is loaded from Postgres
+3. A Claude-powered agent processes the message with access to 7 tools
+4. Tools call existing scraping/booking modules to interact with SquashCity
+5. The agent's response is sent back to Telegram
+6. A background scheduler checks the booking queue every 5 minutes
+
+### Agent Tools
+
+| Tool | What it does |
+|------|-------------|
+| `get_today_date` | Resolves "next Tuesday" → 2025-03-04 |
+| `check_availability` | Shows free courts for a date/time |
+| `book_court` | Books a specific court (3-step flow) |
+| `list_my_reservations` | Shows upcoming bookings |
+| `add_to_queue` | Queues a request for auto-retry |
+| `list_queue` | Shows pending queue entries |
+| `remove_from_queue` | Cancels a queued request |
 
 ## Tech Stack
 
-- **[Bun](https://bun.sh)** - Fast TypeScript runtime
+- **[Bun](https://bun.sh)** - TypeScript runtime
 - **[Grammy](https://grammy.dev)** - Telegram bot framework
+- **[pi-agent-core](https://github.com/nicholasgasior/pi-agent-core)** - Agent orchestration
+- **[pi-ai](https://github.com/nicholasgasior/pi-ai)** - LLM communication (Anthropic/Claude)
+- **[Drizzle ORM](https://orm.drizzle.team)** - Type-safe Postgres ORM
 - **[Cheerio](https://cheerio.js.org)** - Server-side HTML parsing
 
 ## Deployment
 
 ### Railway (recommended)
 
-Deployed on [Railway](https://railway.com) with cron-based scheduling. Pushes to `main` auto-deploy via GitHub Actions.
+Deployed on [Railway](https://railway.com) as a long-running service with webhook mode. Pushes to `main` auto-deploy via GitHub Actions.
+
+Set `WEBHOOK_DOMAIN` to your Railway public domain to enable webhook mode. Migrations run automatically on startup.
 
 ## License
 

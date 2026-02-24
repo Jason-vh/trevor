@@ -6,7 +6,18 @@ export interface Config {
 
   telegram: {
     token: string;
-    chatId: string;
+    chatIds: Set<string>;
+  };
+
+  anthropic: {
+    apiKey: string;
+  };
+
+  databaseUrl: string;
+
+  webhook?: {
+    domain: string;
+    secret: string;
   };
 }
 
@@ -18,6 +29,14 @@ if (!Bun.env.TELEGRAM_BOT_TOKEN || !Bun.env.TELEGRAM_CHAT_ID) {
   throw new Error("Missing Telegram configuration");
 }
 
+if (!Bun.env.ANTHROPIC_API_KEY) {
+  throw new Error("Missing ANTHROPIC_API_KEY");
+}
+
+if (!Bun.env.DATABASE_URL) {
+  throw new Error("Missing DATABASE_URL");
+}
+
 export const config: Config = {
   squashCityCredentials: {
     username: Bun.env.SQUASH_CITY_USERNAME,
@@ -25,6 +44,16 @@ export const config: Config = {
   },
   telegram: {
     token: Bun.env.TELEGRAM_BOT_TOKEN,
-    chatId: Bun.env.TELEGRAM_CHAT_ID,
+    chatIds: new Set(Bun.env.TELEGRAM_CHAT_ID.split(",").map((id) => id.trim())),
   },
+  anthropic: {
+    apiKey: Bun.env.ANTHROPIC_API_KEY,
+  },
+  databaseUrl: Bun.env.DATABASE_URL,
+  webhook: Bun.env.WEBHOOK_DOMAIN
+    ? {
+        domain: Bun.env.WEBHOOK_DOMAIN,
+        secret: Bun.env.WEBHOOK_SECRET || "",
+      }
+    : undefined,
 };

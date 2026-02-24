@@ -1,79 +1,116 @@
-import { login } from "@/modules/auth";
-import { bookSlot, getCandidateSlots } from "@/modules/booking";
-import { buildBookingMessage, buildMessage, notify } from "@/modules/notify";
-import { filterAndGroupSlots, filterByTimeRange, getAllSlotsOnDate } from "@/modules/slots";
-import { findChangedSlots, loadState, saveState } from "@/modules/state";
-import { getArgs } from "@/utils/args";
-import { getNextDays } from "@/utils/datetime";
+import { Bot, webhookCallback } from "grammy";
+
+import { runAgent } from "@/agent/agent";
+import { startScheduler, stopScheduler } from "@/modules/scheduler";
+import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
 
-async function main() {
-  const DAYS_TO_LOOK_AHEAD = 8;
+const bot = new Bot(config.telegram.token);
 
-  const args = getArgs();
+// Only respond to allowed chats. In groups, only respond when mentioned.
+bot.on("message:text", async (ctx) => {
+  const chatId = String(ctx.chat.id);
 
-  const upcomingDays = getNextDays(DAYS_TO_LOOK_AHEAD).filter(({ day }) => args.days.includes(day));
-  logger.info("We're looking for availability on the following dates", { upcomingDays, ...args });
+  if (!config.telegram.chatIds.has(chatId)) {
+    logger.warn("Ignoring message from unauthorized chat", { chatId: ctx.chat.id });
+    return;
+  }
 
-  const session = await login();
+  const isGroup = ctx.chat.type === "group" || ctx.chat.type === "supergroup";
+  let messageText = ctx.message.text;
 
-  const allSlots = [];
-  for (const { date } of upcomingDays) {
-    try {
-      const slots = await getAllSlotsOnDate(session, date);
-      allSlots.push(...slots);
-    } catch (error) {
-      logger.error("Failed to fetch slots for date", { date, error });
+  if (isGroup) {
+    // In groups, only respond when the bot is @mentioned
+    const botUsername = ctx.me.username;
+    const mention = `@${botUsername}`;
+
+    if (!messageText.includes(mention)) {
+      return;
+    }
+
+    // Strip the @mention from the message
+    messageText = messageText.replaceAll(mention, "").trim();
+
+    if (!messageText) {
+      await ctx.reply("Yes? What can I do for you?", { reply_parameters: { message_id: ctx.message.message_id } });
+      return;
     }
   }
 
-  const changedSlots = findChangedSlots(await loadState(), allSlots);
-  logger.info(`Found ${changedSlots.length} changed slots`, { changedSlots });
+  logger.info("Received message", { chatId, text: messageText, isGroup });
 
-  saveState(allSlots);
+  try {
+    const response = await runAgent(chatId, messageText);
+    const replyOptions = isGroup
+      ? { parse_mode: "HTML" as const, reply_parameters: { message_id: ctx.message.message_id } }
+      : { parse_mode: "HTML" as const };
+    await ctx.reply(response, replyOptions);
+  } catch (error) {
+    logger.error("Error processing message", { error });
+    await ctx.reply("Sorry, something went wrong. Please try again.");
+  }
+});
 
-  // Auto-booking flow
-  if (args.book) {
-    const availableSlots = filterByTimeRange(allSlots, args.from, args.to);
-    const candidates = getCandidateSlots(availableSlots, args.from, args.to);
+async function main() {
+  if (config.webhook) {
+    // Production: webhook mode via Bun.serve
+    const { domain, secret } = config.webhook;
+    const handleUpdate = webhookCallback(bot, "bun", { secretToken: secret });
 
-    logger.info(`Found ${candidates.length} booking candidates`);
+    const server = Bun.serve({
+      port: Number(Bun.env.PORT) || 3000,
+      fetch(req) {
+        const url = new URL(req.url);
 
-    if (candidates.length > 0) {
-      for (const candidate of candidates) {
-        logger.info(
-          `Attempting to book: ${candidate.courtName} on ${candidate.formattedDate} at ${candidate.formattedStartTime}`,
-        );
-
-        const result = await bookSlot(candidate, session);
-
-        if (result.success) {
-          const message = buildBookingMessage(result);
-          logger.info("Booking notification", { message });
-          await notify(message);
-          break;
+        if (url.pathname === "/health") {
+          return new Response("OK");
         }
 
-        logger.warn(`Booking failed for ${candidate.courtName}: ${result.error}, trying next candidate`);
-      }
-    }
+        if (url.pathname === "/webhook" && req.method === "POST") {
+          // Grammy's Bun adapter expects a slightly different Request type
+          return handleUpdate(req as unknown as Parameters<typeof handleUpdate>[0]);
+        }
 
-    return;
+        return new Response("Not found", { status: 404 });
+      },
+    });
+
+    await bot.api.setWebhook(`https://${domain}/webhook`, {
+      secret_token: secret,
+    });
+
+    logger.info(`Webhook set: https://${domain}/webhook`);
+    logger.info(`Server listening on port ${server.port}`);
+
+    const shutdown = () => {
+      stopScheduler();
+      server.stop();
+      process.exit(0);
+    };
+
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
+  } else {
+    // Development: long polling mode
+    logger.info("Starting bot in long-polling mode");
+
+    const shutdown = () => {
+      stopScheduler();
+      bot.stop();
+      process.exit(0);
+    };
+
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
+
+    bot.start();
   }
 
-  // Notification flow for changed slots (only when not in booking mode)
-  const groupedSlots = filterAndGroupSlots(changedSlots, args.from, args.to);
-
-  if (groupedSlots.size === 0) {
-    logger.info("Exiting - no useful slots found");
-    return;
-  }
-
-  const message = buildMessage(groupedSlots);
-  await notify(message);
+  startScheduler(bot);
+  logger.info("Trevor is running!");
 }
 
 main().catch((error) => {
-  logger.error(error);
+  logger.error("Fatal error", { error });
   process.exit(1);
 });

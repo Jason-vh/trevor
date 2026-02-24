@@ -1,11 +1,11 @@
 {
-  "$schema": "https://railway.com/railway.schema.json",
-  "build": {
-    "builder": "NIXPACKS"
-  },
-  "deploy": {
-    "startCommand": "bun run src/index.ts --from 18:30 --to 18:30 --day tue --book",
-    "restartPolicyType": "NEVER",
-    "region": "europe-west4"
-  }
+	"$schema": "https://railway.com/railway.schema.json",
+	"build": {
+		"builder": "NIXPACKS"
+	},
+	"deploy": {
+		"startCommand": "bunx drizzle-kit migrate && bun run src/index.ts",
+		"restartPolicyType": "ON_FAILURE",
+		"region": "europe-west4"
+	}
 }

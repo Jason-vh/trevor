@@ -2,21 +2,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project: Trevor - Squash Court Monitor
+## Project: Trevor - Squash Court Chatbot
 
-Automated system that monitors court availability at SquashCity (https://squashcity.baanreserveren.nl/), sends Telegram alerts when **new** slots appear, and optionally **auto-books** the earliest available court. Uses state tracking to avoid spam and duplicate bookings.
+Conversational AI chatbot that monitors squash court availability at SquashCity (https://squashcity.baanreserveren.nl/), books courts on demand via Telegram, and queues requests for automatic retry. Powered by pi-agent-core with Claude as the LLM.
 
 ## Essential Commands
 
 ```bash
-# Run once (notify only)
-bun start --from 17:00 --to 18:00 --day tue --day wed
-
-# Run once (auto-book)
-bun start --from 17:00 --to 18:00 --day tue --day wed --book
+# Start bot (long-polling mode for local dev)
+bun start
 
 # Development with auto-reload
 bun run dev
+
+# Generate Drizzle migration after schema changes
+bun run db:generate
+
+# Apply migrations
+bun run db:migrate
 
 # Run tests
 bun test
@@ -27,13 +30,19 @@ bun test
 ### Core Flow
 
 ```
-1. Auth     → Login, extract session cookies
-2. Scraper  → Inject cookies, fetch/post HTML pages
-3. Parser   → Cheerio extracts availability from HTML
-4. State    → Compare with previous state, find changes
-5. Booking  → (optional) Auto-book earliest available slot
-6. Notify   → Send Telegram message for new slots / bookings
+User message → Telegram (webhook in prod / polling in dev)
+  → Grammy bot.on("message:text")
+  → pi-agent-core Agent with tools
+  → tool execution (reusing existing scraping/booking modules)
+  → response back to Telegram
 ```
+
+Background `setInterval` scheduler processes the booking queue every 5 minutes.
+
+### Transport Modes
+
+- **Production** (Railway): Webhooks via `Bun.serve` HTTP server. Detected by presence of `WEBHOOK_DOMAIN` env var.
+- **Development** (local): Grammy long polling via `bot.start()`. No public URL needed. Detected by absence of `WEBHOOK_DOMAIN`.
 
 ### Why This Approach?
 
@@ -44,17 +53,58 @@ The target website uses **server-side rendered HTML** (not a SPA), so:
 
 ### Key Design Decisions
 
-**Session Management**: Cookie-based auth stored in-memory. The `Session` interface (src/types/index.ts:1) holds a `cookies[]` array extracted from login response headers using Bun's `response.headers.getSetCookie()`.
+**Session Management**: Cookie-based auth stored in-memory with 30min TTL cache (src/modules/session-manager.ts). The `Session` interface (src/types/index.ts:1) holds a `cookies[]` array extracted from login response headers using Bun's `response.headers.getSetCookie()`.
 
-**State Tracking**: JSON file (`data/state.json`) persists all slot states between runs. The `findChangedSlots()` function (src/modules/state.ts:22) compares old vs new states by courtId, time, date, and availability to detect changes. Only changed slots trigger notifications.
+**Agent Architecture**: Each incoming message creates a fresh pi-agent-core `Agent` instance with conversation history loaded from Postgres. The agent has 7 tools for checking availability, booking courts, managing the queue, etc. Conversation history is stored as user/assistant text messages in the `messages` table.
 
-**Configuration**: All config in src/utils/config.ts loads from environment variables (`.env.local`). Required: `SQUASH_CITY_USERNAME`, `SQUASH_CITY_PASSWORD`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+**Database**: Postgres via Drizzle ORM. Two tables: `queue` (booking requests for background retry) and `messages` (conversation history per chat). Migrations in `drizzle/`.
+
+**Chat Authorization**: Supports multiple Telegram chat IDs (comma-separated in `TELEGRAM_CHAT_ID`). In groups, only responds when `@mentioned`. In DMs, responds to all messages.
+
+**Configuration**: All config in src/utils/config.ts loads from environment variables (`.env.local`). Required: `SQUASH_CITY_USERNAME`, `SQUASH_CITY_PASSWORD`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ANTHROPIC_API_KEY`, `DATABASE_URL`.
 
 **Logging**: Minimal JSON structured logger (src/utils/logger.ts). Outputs single-line JSON with `level`, `message`, `timestamp`, and optional custom fields. Integrates with Railway's log filtering/querying.
 
 **Path Aliases**: TypeScript paths use `@/*` → `./src/*` (tsconfig.json:10)
 
 ## Module Responsibilities
+
+### src/agent/agent.ts
+
+Agent orchestration:
+
+- Creates a pi-agent-core `Agent` per request with system prompt, tools, and conversation history
+- Loads history from Postgres, runs the agentic loop, extracts the final text response
+- Saves user message and assistant response to DB after each interaction
+
+### src/agent/tools.ts
+
+7 tools using TypeBox schemas + execute functions that call existing modules:
+
+| Tool | Purpose |
+|------|---------|
+| `get_today_date` | Resolve relative dates ("next Tuesday") → YYYY-MM-DD |
+| `check_availability` | Show free courts for a date/time range |
+| `book_court` | Execute the 3-step booking flow |
+| `list_my_reservations` | Show user's upcoming bookings (next 8 days) |
+| `add_to_queue` | Queue a request for periodic retry |
+| `list_queue` | Show pending queue entries |
+| `remove_from_queue` | Cancel a queue entry |
+
+### src/agent/system-prompt.ts
+
+Trevor's personality and instructions. Casual squash buddy, responds in user's language, confirms before booking, uses Telegram HTML formatting.
+
+### src/db/schema.ts
+
+Drizzle table definitions:
+
+- `queue` — booking requests with status lifecycle (pending → processing → booked/expired/cancelled)
+- `messages` — conversation history per chat_id (role + jsonb content)
+
+### src/db/index.ts
+
+Drizzle client setup with postgres-js driver.
 
 ### src/modules/auth.ts
 
@@ -64,6 +114,13 @@ Handles login flow:
 - Extracts `Set-Cookie` headers via `response.headers.getSetCookie()`
 - Returns `Session` object with cookies array
 - Expects 302 redirect on success
+
+### src/modules/session-manager.ts
+
+Wraps `login()` with 30min TTL cache:
+
+- `getSession()` — returns cached session or logs in fresh
+- `invalidateSession()` — forces re-login on next call
 
 ### src/modules/scraper.ts
 
@@ -95,12 +152,10 @@ Business logic for filtering/grouping:
 
 ### src/modules/state.ts
 
-Persistence layer:
+Legacy persistence layer (from cron mode, still available):
 
 - `saveState()` / `loadState()` - Persists all slots to `data/state.json`
 - `findChangedSlots()` - Compares slots by courtId + time + date + availability, returns delta
-- `saveBookedSlot()` / `loadBookedSlots()` - Tracks booked slots in `data/booked.json`
-- `cleanupBookedSlots()` - Removes past booked slots on each run
 
 ### src/modules/booking.ts
 
@@ -115,22 +170,46 @@ Auto-booking engine (3-step form flow):
 
 ### src/modules/notify.ts
 
-Telegram integration via Grammy:
+Telegram message formatting:
 
 - `buildMessage()` - Formats changed slots as Markdown (groups by date, then time)
-- `buildBookingMessage()` - Formats booking confirmations/failures
-- `notify()` - Sends message to configured chat ID
+- `buildBookingMessage()` - Formats booking confirmations/failures (used by scheduler)
+
+### src/modules/queue.ts
+
+Queue CRUD operations against Postgres via Drizzle:
+
+- `addToQueue()` / `listPendingQueue()` / `removeFromQueue()`
+- `getProcessableEntries()` / `setQueueStatus()` / `expirePastEntries()`
+
+### src/modules/history.ts
+
+Conversation history CRUD against Postgres via Drizzle:
+
+- `saveMessage()` — stores user/assistant messages with chat_id
+- `loadHistory()` — loads last 20 messages, reconstructs pi-ai Message objects
+
+### src/modules/scheduler.ts
+
+Background scheduler with `isProcessing` guard:
+
+- Runs every 5 minutes via `setInterval`
+- Expires past-date queue entries
+- For each pending entry: login, fetch slots, filter, attempt booking
+- On success: updates queue status to "booked", sends Telegram notification to all chats
 
 ### src/index.ts (Entry Point)
 
-Main orchestration:
+Bot setup and lifecycle:
 
-1. Parse CLI args (`--from`, `--to`, `--day`, `--book` flags)
-2. Filter next 7 days by requested weekdays
-3. Login and fetch slots for each day sequentially (with error handling per day)
-4. Compare with previous state, save new state
-5. If `--book`: clean up past bookings, find candidates, attempt booking, notify on result
-6. Build and send Telegram notification for changed slots (if any)
+1. Create Grammy Bot instance
+2. Auth middleware: ignore messages from chats not in `config.telegram.chatIds`
+3. Group filtering: only respond to `@mentions` in groups, strip mention from message text
+4. Register `bot.on("message:text")` → calls `runAgent()` → replies with HTML formatting
+5. If `WEBHOOK_DOMAIN` set: start `Bun.serve` with webhook endpoint + health check
+6. If no `WEBHOOK_DOMAIN`: start Grammy long polling
+7. Start scheduler
+8. SIGTERM/SIGINT handler: stop scheduler, stop server/polling, exit
 
 ## Critical Implementation Details
 
@@ -180,20 +259,24 @@ $("tr[data-time]").each((_, row) => {
 });
 ```
 
-### State Change Detection
+### Tool Definition Pattern (pi-agent-core)
 
 ```typescript
-// Only notify if slot didn't exist before OR availability changed
-const changedSlots = newSlots.filter((newSlot) => {
-  const oldSlot = oldSlots.find(
-    (old) =>
-      old.courtId === newSlot.courtId &&
-      old.formattedStartTime === newSlot.formattedStartTime &&
-      old.formattedDate === newSlot.formattedDate &&
-      old.isAvailable === newSlot.isAvailable,
-  );
-  return oldSlot === undefined; // true = changed
+const schema = Type.Object({
+  date: Type.String({ description: "Date in YYYY-MM-DD format" }),
+  time_from: Type.Optional(Type.String({ description: "Start time HH:MM" })),
 });
+
+const tool: AgentTool<typeof schema> = {
+  name: "check_availability",
+  label: "Check Availability",
+  description: "Check available squash courts for a specific date and time range",
+  parameters: schema,
+  execute: async (toolCallId, params) => {
+    // params is typed: { date: string; time_from?: string }
+    return { content: [{ type: "text", text: JSON.stringify(result) }], details: undefined };
+  },
+};
 ```
 
 ## Environment Variables
@@ -204,19 +287,27 @@ Create `.env.local` (gitignored):
 SQUASH_CITY_USERNAME=your_username
 SQUASH_CITY_PASSWORD=your_password
 TELEGRAM_BOT_TOKEN=bot_token_from_botfather
-TELEGRAM_CHAT_ID=your_chat_id
+TELEGRAM_CHAT_ID=your_chat_id              # comma-separated for multiple chats
+ANTHROPIC_API_KEY=sk-ant-your_key_here
+DATABASE_URL=postgresql://user:password@localhost:5432/trevor
+
+# Production only (omit for local dev):
+# WEBHOOK_DOMAIN=your-app.up.railway.app
+# WEBHOOK_SECRET=random_secret_string
 ```
 
 ## Deployment
 
 ### Railway (primary)
 
-Deployed on Railway with cron-based scheduling. Config in `railway.json`:
+Deployed on Railway as a long-running service. Config in `railway.json`:
 
 - Builder: Nixpacks
-- Start command: `bun run src/index.ts --from 18:00 --to 19:00 --day tue --day wed --book`
+- Start command: `bunx drizzle-kit migrate && bun run src/index.ts`
 - Region: `europe-west4`
-- Restart policy: never (exit after each run)
+- Restart policy: ON_FAILURE
+
+Required Railway env vars: all from `.env.local` above, plus `WEBHOOK_DOMAIN` (use `RAILWAY_PUBLIC_DOMAIN`) and `WEBHOOK_SECRET`.
 
 **CI/CD**: Pushes to `main` auto-deploy via GitHub Actions (`.github/workflows/deploy.yml`). Uses `RAILWAY_TOKEN` secret for authentication.
 

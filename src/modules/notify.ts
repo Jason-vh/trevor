@@ -45,9 +45,11 @@ export async function notify(message: string): Promise<void> {
   const bot = new Bot(config.telegram.token);
 
   try {
-    await bot.api.sendMessage(config.telegram.chatId, message, {
-      parse_mode: "Markdown",
-    });
+    for (const chatId of config.telegram.chatIds) {
+      await bot.api.sendMessage(chatId, message, {
+        parse_mode: "Markdown",
+      });
+    }
 
     logger.info("Message sent to Telegram", { message });
   } catch (error) {

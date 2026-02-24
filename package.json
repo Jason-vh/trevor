@@ -7,12 +7,15 @@
     "start": "bun run src/index.ts",
     "dev": "bun --watch src/index.ts",
     "test": "bun test",
+    "db:generate": "bunx drizzle-kit generate",
+    "db:migrate": "bunx drizzle-kit migrate",
     "fmt": "oxfmt --write src",
     "fmt:check": "oxfmt --check src",
     "lint": "oxlint src"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "drizzle-kit": "^0.31.9",
     "lefthook": "^2.1.1",
     "oxfmt": "^0.35.0",
     "oxlint": "^1.50.0"
@@ -21,7 +24,11 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@mariozechner/pi-agent-core": "^0.54.2",
+    "@mariozechner/pi-ai": "^0.54.2",
     "cheerio": "^1.1.2",
-    "grammy": "^1.38.2"
+    "drizzle-orm": "^0.45.1",
+    "grammy": "^1.38.2",
+    "postgres": "^3.4.8"
   }
 }
