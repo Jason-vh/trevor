@@ -15,6 +15,9 @@ bun start
 # Development with auto-reload
 bun run dev
 
+# Run cron job (queue processing, exits when done)
+bun run cron
+
 # Generate Drizzle migration after schema changes
 bun run db:generate
 
@@ -37,7 +40,7 @@ User message → Telegram (webhook in prod / polling in dev)
   → response back to Telegram
 ```
 
-Background `setInterval` scheduler processes the booking queue every 5 minutes.
+A separate Railway cron job (`src/cron.ts`) processes the booking queue every 5 minutes.
 
 ### Transport Modes
 
@@ -191,12 +194,19 @@ Conversation history CRUD against Postgres via Drizzle:
 
 ### src/modules/scheduler.ts
 
-Background scheduler with `isProcessing` guard:
+Queue processing logic, exported as `processQueue(bot)`:
 
-- Runs every 5 minutes via `setInterval`
 - Expires past-date queue entries
 - For each pending entry: login, fetch slots, filter, attempt booking
 - On success: updates queue status to "booked", sends Telegram notification to all chats
+
+### src/cron.ts (Cron Entry Point)
+
+Standalone script for Railway cron (`*/5 * * * *`):
+
+- Creates a Grammy Bot instance (for sending notifications)
+- Calls `processQueue(bot)`
+- Exits when done
 
 ### src/index.ts (Entry Point)
 
@@ -208,8 +218,7 @@ Bot setup and lifecycle:
 4. Register `bot.on("message:text")` → calls `runAgent()` → replies with HTML formatting
 5. If `WEBHOOK_DOMAIN` set: start `Bun.serve` with webhook endpoint + health check
 6. If no `WEBHOOK_DOMAIN`: start Grammy long polling
-7. Start scheduler
-8. SIGTERM/SIGINT handler: stop scheduler, stop server/polling, exit
+7. SIGTERM/SIGINT handler: stop server/polling, exit
 
 ## Critical Implementation Details
 
@@ -300,14 +309,22 @@ DATABASE_URL=postgresql://user:password@localhost:5432/trevor
 
 ### Railway (primary)
 
-Deployed on Railway as a long-running service. Config in `railway.json`:
+Two Railway services from the same repo:
+
+**Web service** (long-running): Telegram webhook server. Config in `railway.json`:
 
 - Builder: Nixpacks
 - Start command: `bunx drizzle-kit migrate && bun run src/index.ts`
 - Region: `europe-west4`
 - Restart policy: ON_FAILURE
 
-Required Railway env vars: all from `.env.local` above, plus `WEBHOOK_DOMAIN` (use `RAILWAY_PUBLIC_DOMAIN`) and `WEBHOOK_SECRET`.
+**Cron service** (scheduled): Queue processing. Configured in Railway dashboard:
+
+- Start command: `bun run src/cron.ts`
+- Schedule: `*/5 * * * *`
+- Restart policy: NEVER
+
+Required Railway env vars: all from `.env.local` above, plus `WEBHOOK_DOMAIN` (use `RAILWAY_PUBLIC_DOMAIN`) and `WEBHOOK_SECRET` (web service only).
 
 **CI/CD**: Pushes to `main` auto-deploy via GitHub Actions (`.github/workflows/deploy.yml`). Uses `RAILWAY_TOKEN` secret for authentication.
 

@@ -11,6 +11,7 @@
     "db:migrate": "bunx drizzle-kit migrate",
     "fmt": "oxfmt --write src",
     "fmt:check": "oxfmt --check src",
+    "cron": "bun run src/cron.ts",
     "lint": "oxlint src"
   },
   "devDependencies": {

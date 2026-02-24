@@ -1,7 +1,6 @@
 import { Bot, webhookCallback } from "grammy";
 
 import { runAgent } from "@/agent/agent";
-import { startScheduler, stopScheduler } from "@/modules/scheduler";
 import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
 
@@ -83,7 +82,6 @@ async function main() {
     logger.info(`Server listening on port ${server.port}`);
 
     const shutdown = () => {
-      stopScheduler();
       server.stop();
       process.exit(0);
     };
@@ -95,7 +93,6 @@ async function main() {
     logger.info("Starting bot in long-polling mode");
 
     const shutdown = () => {
-      stopScheduler();
       bot.stop();
       process.exit(0);
     };
@@ -106,7 +103,6 @@ async function main() {
     bot.start();
   }
 
-  startScheduler(bot);
   logger.info("Trevor is running!");
 }
 

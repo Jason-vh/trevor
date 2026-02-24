@@ -84,7 +84,7 @@ User message → Telegram → Grammy bot → pi-agent-core Agent → tool calls 
 3. A Claude-powered agent processes the message with access to 7 tools
 4. Tools call existing scraping/booking modules to interact with SquashCity
 5. The agent's response is sent back to Telegram
-6. A background scheduler checks the booking queue every 5 minutes
+6. A Railway cron job processes the booking queue every 5 minutes (`bun run cron`)
 
 ### Agent Tools
 
@@ -111,9 +111,12 @@ User message → Telegram → Grammy bot → pi-agent-core Agent → tool calls 
 
 ### Railway (recommended)
 
-Deployed on [Railway](https://railway.com) as a long-running service with webhook mode. Pushes to `main` auto-deploy via GitHub Actions.
+Two Railway services from the same repo:
 
-Set `WEBHOOK_DOMAIN` to your Railway public domain to enable webhook mode. Migrations run automatically on startup.
+- **Web service** — long-running webhook server for Telegram. Start command: `bunx drizzle-kit migrate && bun run src/index.ts`. Restart policy: ON_FAILURE.
+- **Cron service** — processes the booking queue. Start command: `bun run src/cron.ts`. Schedule: `*/5 * * * *`. Restart policy: NEVER.
+
+Pushes to `main` auto-deploy via GitHub Actions. Set `WEBHOOK_DOMAIN` to your Railway public domain to enable webhook mode on the web service.
 
 ## License
 
