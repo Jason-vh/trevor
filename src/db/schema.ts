@@ -7,6 +7,7 @@ export const queue = pgTable("queue", {
   timeFrom: text("time_from").notNull(),
   timeTo: text("time_to").notNull(),
   status: text("status").notNull().default("pending"),
+  calendarEventId: text("calendar_event_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

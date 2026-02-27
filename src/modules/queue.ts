@@ -34,6 +34,10 @@ export async function setQueueStatus(id: number, status: string) {
   await db.update(queue).set({ status, updatedAt: new Date() }).where(eq(queue.id, id));
 }
 
+export async function setQueueCalendarEventId(id: number, calendarEventId: string) {
+  await db.update(queue).set({ calendarEventId, updatedAt: new Date() }).where(eq(queue.id, id));
+}
+
 export async function expirePastEntries() {
   const today = new Date().toISOString().split("T")[0];
   const result = await db

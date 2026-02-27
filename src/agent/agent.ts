@@ -40,7 +40,7 @@ export async function runAgent(chatId: string, userMessage: string): Promise<str
   for (const msg of allMessages) {
     if (msg.role === "assistant") {
       for (const part of msg.content) {
-        if (part.type === "tool_use") {
+        if (part.type === "toolCall") {
           toolsInvoked.push(part.name);
         }
       }

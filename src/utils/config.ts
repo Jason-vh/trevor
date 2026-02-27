@@ -15,6 +15,8 @@ export interface Config {
 
   databaseUrl: string;
 
+  calendarWebhookUrl?: string;
+
   webhook?: {
     domain: string;
     secret: string;
@@ -50,6 +52,7 @@ export const config: Config = {
     apiKey: Bun.env.ANTHROPIC_API_KEY,
   },
   databaseUrl: Bun.env.DATABASE_URL,
+  calendarWebhookUrl: Bun.env["CALENDAR_WEBHOOK_URL"],
   webhook: Bun.env.WEBHOOK_DOMAIN
     ? {
         domain: Bun.env.WEBHOOK_DOMAIN,

@@ -15,6 +15,13 @@
       "when": 1772185732455,
       "tag": "0001_eminent_wolf_cub",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772187438731,
+      "tag": "0002_equal_namora",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "queue" ADD COLUMN "calendar_event_id" text;

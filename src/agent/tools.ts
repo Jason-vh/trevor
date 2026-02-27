@@ -2,7 +2,8 @@ import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Type } from "@mariozechner/pi-ai";
 
 import { bookSlot } from "@/modules/booking";
-import { addToQueue, listPendingQueue, removeFromQueue } from "@/modules/queue";
+import { createConfirmedEvent, createTentativeEvent } from "@/modules/calendar";
+import { addToQueue, listPendingQueue, removeFromQueue, setQueueCalendarEventId } from "@/modules/queue";
 import { getSession } from "@/modules/session-manager";
 import { getAllSlotsOnDate, filterByTimeRange } from "@/modules/slots";
 import { formatDateISO, getNextDays } from "@/utils/datetime";
@@ -145,6 +146,9 @@ const bookCourt: AgentTool<typeof bookCourtParams> = {
           reservationId: result.reservationId,
           latencyMs: elapsed(),
         });
+        await createConfirmedEvent(targetSlot.courtName, targetSlot.dateISO, targetSlot.formattedStartTime).catch(
+          (err) => logger.warn("Tool: book_court calendar event failed", { error: err }),
+        );
         return text(
           `Successfully booked ${targetSlot.courtName} on ${targetSlot.formattedDate} at ${targetSlot.formattedStartTime}. Reservation ID: ${result.reservationId || "N/A"}`,
         );
@@ -223,6 +227,8 @@ function makeAddToQueueTool(chatId: string): AgentTool<typeof addToQueueParams> 
         timeFrom: params.time_from,
         timeTo: params.time_to,
       });
+      const eventId = await createTentativeEvent(params.date, params.time_from, params.time_to);
+      if (eventId) await setQueueCalendarEventId(entry.id, eventId);
       return text(
         `Added to queue (ID: ${entry.id}). I'll check every 5 minutes and book when a court becomes available.`,
       );

@@ -1,6 +1,7 @@
 import type { Bot } from "grammy";
 
 import { bookSlot } from "@/modules/booking";
+import { confirmEvent, createConfirmedEvent } from "@/modules/calendar";
 import { buildBookingMessage } from "@/modules/notify";
 import { expirePastEntries, getProcessableEntries, setQueueStatus } from "@/modules/queue";
 import { getSession } from "@/modules/session-manager";
@@ -52,6 +53,20 @@ export async function processQueue(bot: Bot): Promise<void> {
 
       if (result.success) {
         await setQueueStatus(entry.id, "booked");
+        try {
+          if (entry.calendarEventId) {
+            await confirmEvent(
+              entry.calendarEventId,
+              result.slot.courtName,
+              result.slot.dateISO,
+              result.slot.formattedStartTime,
+            );
+          } else {
+            await createConfirmedEvent(result.slot.courtName, result.slot.dateISO, result.slot.formattedStartTime);
+          }
+        } catch (calendarError) {
+          logger.warn("Queue: calendar update failed", { id: entry.id, error: calendarError });
+        }
         const message = buildBookingMessage(result);
         await bot.api.sendMessage(entry.chatId, message, {
           parse_mode: "Markdown",

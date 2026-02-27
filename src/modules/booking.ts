@@ -2,12 +2,10 @@ import * as cheerio from "cheerio";
 
 import { SQUASH_CITY_URL } from "@/constants";
 import { getPage, postPage } from "@/modules/scraper";
+import { PLAYERS } from "@/players";
 import type { BookingResult, CourtAvailability, Session } from "@/types";
 import { getTimeInMinutes } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
-
-// Default booking partner: Amp Varavarn
-const BOOKING_PARTNER_ID = "1280498";
 
 const RESERVATIONS_URL = `${SQUASH_CITY_URL}/reservations`;
 
@@ -79,8 +77,10 @@ export async function bookSlot(slot: CourtAvailability, session: Session): Promi
       if (name) formData.set(name, value || "");
     });
 
-    // Override player 2 with our booking partner
-    formData.set("players[2]", BOOKING_PARTNER_ID);
+    // Set players starting at slot 2 (slot 1 is the account owner)
+    PLAYERS.forEach((player, i) => {
+      formData.set(`players[${i + 2}]`, player.squashCityUserId);
+    });
 
     const token = formData.get("_token");
     if (!token) {
