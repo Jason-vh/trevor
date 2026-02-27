@@ -66,6 +66,8 @@ async function main() {
     // Production: webhook mode via Bun.serve
     const { domain, secret } = config.webhook;
 
+    await bot.init();
+
     const server = Bun.serve({
       port: Number(Bun.env.PORT) || 3000,
       async fetch(req) {
