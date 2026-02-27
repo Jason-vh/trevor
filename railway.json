@@ -4,7 +4,8 @@
 		"builder": "RAILPACK"
 	},
 	"deploy": {
-		"startCommand": "bunx drizzle-kit migrate && bun run src/index.ts",
+		"preDeployCommand": "bunx drizzle-kit migrate",
+		"startCommand": "bun run src/index.ts",
 		"restartPolicyType": "ON_FAILURE",
 		"region": "europe-west4"
 	}
