@@ -47,6 +47,14 @@ export function getCandidateSlots(slots: CourtAvailability[], from: string, to: 
  */
 export async function bookSlot(slot: CourtAvailability, session: Session): Promise<BookingResult> {
   const { courtId, utc } = slot;
+  const elapsed = logger.time();
+
+  logger.info("Booking: attempt", {
+    courtId,
+    courtName: slot.courtName,
+    date: slot.dateISO,
+    time: slot.formattedStartTime,
+  });
 
   try {
     // Step 1: GET the booking form
@@ -108,7 +116,14 @@ export async function bookSlot(slot: CourtAvailability, session: Session): Promi
     return { success: false, slot, error: `Step 2 failed with status ${confirmResponse.status}` };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error("Booking failed", { error: message, slot });
+    logger.error("Booking: failed with exception", {
+      courtId,
+      courtName: slot.courtName,
+      date: slot.dateISO,
+      time: slot.formattedStartTime,
+      error: message,
+      latencyMs: elapsed(),
+    });
     return { success: false, slot, error: message };
   }
 }
@@ -151,9 +166,21 @@ async function parseAndSubmitConfirmation(
   try {
     const result = JSON.parse(finalText);
     if (result.id) {
-      logger.info("Booking successful", { reservationId: result.id, slot });
+      logger.info("Booking: success (JSON response)", {
+        courtId: slot.courtId,
+        courtName: slot.courtName,
+        date: slot.dateISO,
+        time: slot.formattedStartTime,
+        reservationId: result.id,
+      });
       return { success: true, slot, reservationId: String(result.id) };
     }
+    logger.warn("Booking: server rejected booking", {
+      courtId: slot.courtId,
+      date: slot.dateISO,
+      time: slot.formattedStartTime,
+      serverMessage: result.message,
+    });
     return { success: false, slot, error: result.message || "Unknown booking error" };
   } catch {
     // Not JSON — check if it's a redirect (success) or HTML error
@@ -162,10 +189,21 @@ async function parseAndSubmitConfirmation(
       const $final = cheerio.load(finalText);
       const successMessage = $final(".alert-success").text().trim();
       if (successMessage) {
-        logger.info("Booking successful (HTML response)", { slot });
+        logger.info("Booking: success (HTML response)", {
+          courtId: slot.courtId,
+          courtName: slot.courtName,
+          date: slot.dateISO,
+          time: slot.formattedStartTime,
+        });
         return { success: true, slot };
       }
     }
+    logger.warn("Booking: unexpected final response", {
+      courtId: slot.courtId,
+      date: slot.dateISO,
+      time: slot.formattedStartTime,
+      status: finalResponse.status,
+    });
     return { success: false, slot, error: `Unexpected response (status ${finalResponse.status})` };
   }
 }

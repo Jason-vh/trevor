@@ -2,6 +2,7 @@ import { and, eq, lt } from "drizzle-orm";
 
 import { db } from "@/db";
 import { queue } from "@/db/schema";
+import { logger } from "@/utils/logger";
 
 export async function addToQueue(date: string, timeFrom: string, timeTo: string) {
   const [entry] = await db
@@ -34,8 +35,12 @@ export async function setQueueStatus(id: number, status: string) {
 
 export async function expirePastEntries() {
   const today = new Date().toISOString().split("T")[0];
-  await db
+  const result = await db
     .update(queue)
     .set({ status: "expired", updatedAt: new Date() })
-    .where(and(eq(queue.status, "pending"), lt(queue.date, today)));
+    .where(and(eq(queue.status, "pending"), lt(queue.date, today)))
+    .returning({ id: queue.id });
+  if (result.length > 0) {
+    logger.info("Queue: expired past entries", { expiredCount: result.length, expiredIds: result.map((r) => r.id) });
+  }
 }

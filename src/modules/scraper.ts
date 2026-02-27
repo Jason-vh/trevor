@@ -7,7 +7,8 @@ function getCookieHeader(session: Session): string {
 }
 
 export async function getPage(url: string, session: Session): Promise<string> {
-  logger.info("Fetching page", { url });
+  const elapsed = logger.time();
+  logger.debug("HTTP GET", { url });
 
   const headers: Bun.HeadersInit = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -18,18 +19,26 @@ export async function getPage(url: string, session: Session): Promise<string> {
   const response = await fetch(url, { method: "GET", headers });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch page: ${response.statusText}, ${await response.text()}`, { cause: response });
+    const body = await response.text();
+    logger.error("HTTP GET failed", {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      latencyMs: elapsed(),
+    });
+    throw new Error(`Failed to fetch page: ${response.statusText}, ${body}`, { cause: response });
   }
 
   const html = await response.text();
 
-  logger.info("Page fetched successfully", { url });
+  logger.debug("HTTP GET success", { url, status: response.status, latencyMs: elapsed() });
 
   return html;
 }
 
 export async function postPage(url: string, body: string, session: Session, referer: string): Promise<Response> {
-  logger.info("Posting to page", { url });
+  const elapsed = logger.time();
+  logger.debug("HTTP POST", { url });
 
   const headers: Bun.HeadersInit = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -42,7 +51,7 @@ export async function postPage(url: string, body: string, session: Session, refe
 
   const response = await fetch(url, { method: "POST", headers, body, redirect: "manual" });
 
-  logger.info("POST completed", { url, status: response.status });
+  logger.debug("HTTP POST completed", { url, status: response.status, latencyMs: elapsed() });
 
   return response;
 }

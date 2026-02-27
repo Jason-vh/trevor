@@ -6,7 +6,8 @@ import { logger } from "@/utils/logger";
 const LOGIN_URL = `${SQUASH_CITY_URL}/auth/login`;
 
 export async function login(): Promise<Session> {
-  logger.info("Logging in to SquashCity");
+  const elapsed = logger.time();
+  logger.info("Auth: logging in to SquashCity");
 
   const { username, password } = config.squashCityCredentials;
 
@@ -28,12 +29,16 @@ export async function login(): Promise<Session> {
   const cookies = response.headers.getSetCookie();
 
   if (cookies.length === 0) {
+    logger.error("Auth: login failed — no cookies in response", { status: response.status, latencyMs: elapsed() });
     throw new Error("No session cookies received from login response");
   }
 
   if (response.status !== 302 && response.status !== 200) {
+    logger.error("Auth: login failed — unexpected status", { status: response.status, latencyMs: elapsed() });
     throw new Error(`Login failed with status ${response.status}`, { cause: response });
   }
+
+  logger.info("Auth: login successful", { cookieCount: cookies.length, latencyMs: elapsed() });
 
   const session: Session = { cookies };
 

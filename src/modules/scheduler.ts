@@ -9,14 +9,24 @@ import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
 
 export async function processQueue(bot: Bot): Promise<void> {
+  const elapsed = logger.time();
+
   await expirePastEntries();
 
   const entries = await getProcessableEntries();
-  if (entries.length === 0) return;
 
-  logger.info(`Processing ${entries.length} queue entries`);
+  if (entries.length === 0) {
+    logger.info("Queue: no pending entries", { latencyMs: elapsed() });
+    return;
+  }
+
+  logger.info("Queue: starting run", { entryCount: entries.length });
 
   const session = await getSession();
+
+  let booked = 0;
+  let failed = 0;
+  let noSlots = 0;
 
   for (const entry of entries) {
     await setQueueStatus(entry.id, "processing");
@@ -28,7 +38,14 @@ export async function processQueue(bot: Bot): Promise<void> {
       const available = filtered.filter((s) => s.isAvailable);
 
       if (available.length === 0) {
+        logger.info("Queue: no available slots for entry", {
+          id: entry.id,
+          date: entry.date,
+          timeFrom: entry.timeFrom,
+          timeTo: entry.timeTo,
+        });
         await setQueueStatus(entry.id, "pending");
+        noSlots++;
         continue;
       }
 
@@ -42,14 +59,25 @@ export async function processQueue(bot: Bot): Promise<void> {
             parse_mode: "Markdown",
           });
         }
-        logger.info(`Booked queue entry ${entry.id}`);
+        logger.info("Queue: entry booked", { id: entry.id, date: entry.date, reservationId: result.reservationId });
+        booked++;
       } else {
         await setQueueStatus(entry.id, "pending");
-        logger.warn(`Booking failed for entry ${entry.id}: ${result.error}`);
+        logger.warn("Queue: booking failed for entry", { id: entry.id, date: entry.date, error: result.error });
+        failed++;
       }
     } catch (error) {
       await setQueueStatus(entry.id, "pending");
-      logger.error(`Error processing entry ${entry.id}`, { error });
+      logger.error("Queue: error processing entry", { id: entry.id, date: entry.date, error });
+      failed++;
     }
   }
+
+  logger.info("Queue: run complete", {
+    entryCount: entries.length,
+    booked,
+    noSlots,
+    failed,
+    latencyMs: elapsed(),
+  });
 }

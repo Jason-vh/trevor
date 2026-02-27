@@ -36,7 +36,13 @@ bot.on("message:text", async (ctx) => {
     }
   }
 
-  logger.info("Received message", { chatId, text: messageText, isGroup });
+  logger.info("Received message", {
+    chatId,
+    textLength: messageText.length,
+    isGroup,
+  });
+
+  const elapsed = logger.time();
 
   try {
     const response = await runAgent(chatId, messageText);
@@ -44,8 +50,9 @@ bot.on("message:text", async (ctx) => {
       ? { parse_mode: "HTML" as const, reply_parameters: { message_id: ctx.message.message_id } }
       : { parse_mode: "HTML" as const };
     await ctx.reply(response, replyOptions);
+    logger.info("Message handled", { chatId, isGroup, latencyMs: elapsed() });
   } catch (error) {
-    logger.error("Error processing message", { error });
+    logger.error("Error processing message", { chatId, isGroup, latencyMs: elapsed(), error });
     await ctx.reply("Sorry, something went wrong. Please try again.");
   }
 });

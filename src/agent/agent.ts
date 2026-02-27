@@ -14,6 +14,8 @@ export async function runAgent(chatId: string, userMessage: string): Promise<str
 
   logger.info("Running agent", { chatId, historyLength: history.length });
 
+  const elapsed = logger.time();
+
   const agent = new Agent({
     initialState: {
       systemPrompt: SYSTEM_PROMPT,
@@ -30,9 +32,20 @@ export async function runAgent(chatId: string, userMessage: string): Promise<str
   await agent.prompt(userMessage);
   await agent.waitForIdle();
 
-  // Extract text from the last assistant message
+  // Extract text from the last assistant message, and collect tool-use blocks
   const allMessages = agent.state.messages;
   let responseText = "";
+  const toolsInvoked: string[] = [];
+
+  for (const msg of allMessages) {
+    if (msg.role === "assistant") {
+      for (const part of msg.content) {
+        if (part.type === "tool_use") {
+          toolsInvoked.push(part.name);
+        }
+      }
+    }
+  }
 
   for (let i = allMessages.length - 1; i >= 0; i--) {
     const msg = allMessages[i];
@@ -51,7 +64,13 @@ export async function runAgent(chatId: string, userMessage: string): Promise<str
     await saveMessage(chatId, "assistant", responseText);
   }
 
-  logger.info("Agent completed", { chatId, responseLength: responseText.length });
+  logger.info("Agent completed", {
+    chatId,
+    toolCallCount: toolsInvoked.length,
+    toolsCalled: toolsInvoked,
+    responseLength: responseText.length,
+    latencyMs: elapsed(),
+  });
 
   return responseText || "I couldn't generate a response. Please try again.";
 }

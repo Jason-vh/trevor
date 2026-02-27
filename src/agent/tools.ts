@@ -6,6 +6,7 @@ import { addToQueue, listPendingQueue, removeFromQueue } from "@/modules/queue";
 import { getSession } from "@/modules/session-manager";
 import { getAllSlotsOnDate, filterByTimeRange } from "@/modules/slots";
 import { formatDateISO, getNextDays } from "@/utils/datetime";
+import { logger } from "@/utils/logger";
 
 function text(t: string) {
   return { content: [{ type: "text" as const, text: t }], details: undefined };
@@ -62,32 +63,46 @@ const checkAvailability: AgentTool<typeof checkAvailabilityParams> = {
   description: "Check available squash courts for a specific date and optional time range.",
   parameters: checkAvailabilityParams,
   execute: async (_toolCallId, params) => {
-    const session = await getSession();
-    const dateObj = new Date(params.date + "T12:00:00");
-    const allSlots = await getAllSlotsOnDate(session, dateObj);
+    const elapsed = logger.time();
+    logger.info("Tool: check_availability", { date: params.date, timeFrom: params.time_from, timeTo: params.time_to });
 
-    let slots = allSlots;
-    if (params.time_from && params.time_to) {
-      slots = filterByTimeRange(allSlots, params.time_from, params.time_to);
-    } else if (params.time_from) {
-      slots = filterByTimeRange(allSlots, params.time_from, params.time_from);
+    try {
+      const session = await getSession();
+      const dateObj = new Date(params.date + "T12:00:00");
+      const allSlots = await getAllSlotsOnDate(session, dateObj);
+
+      let slots = allSlots;
+      if (params.time_from && params.time_to) {
+        slots = filterByTimeRange(allSlots, params.time_from, params.time_to);
+      } else if (params.time_from) {
+        slots = filterByTimeRange(allSlots, params.time_from, params.time_from);
+      }
+
+      const available = slots.filter((s) => s.isAvailable);
+      const result = available.map((s) => ({
+        courtName: s.courtName,
+        courtId: s.courtId,
+        time: s.formattedStartTime,
+        date: s.formattedDate,
+        dateISO: s.dateISO,
+        offPeak: s.offPeak,
+      }));
+
+      logger.info("Tool: check_availability completed", {
+        date: params.date,
+        availableCount: result.length,
+        latencyMs: elapsed(),
+      });
+
+      if (result.length === 0) {
+        return text("No available courts found for the given date/time range.");
+      }
+
+      return text(JSON.stringify(result, null, 2));
+    } catch (error) {
+      logger.error("Tool: check_availability failed", { date: params.date, latencyMs: elapsed(), error });
+      throw error;
     }
-
-    const available = slots.filter((s) => s.isAvailable);
-    const result = available.map((s) => ({
-      courtName: s.courtName,
-      courtId: s.courtId,
-      time: s.formattedStartTime,
-      date: s.formattedDate,
-      dateISO: s.dateISO,
-      offPeak: s.offPeak,
-    }));
-
-    if (result.length === 0) {
-      return text("No available courts found for the given date/time range.");
-    }
-
-    return text(JSON.stringify(result, null, 2));
   },
 };
 
@@ -97,27 +112,63 @@ const bookCourt: AgentTool<typeof bookCourtParams> = {
   description: "Book a specific squash court. Requires the court ID, date, and time.",
   parameters: bookCourtParams,
   execute: async (_toolCallId, params) => {
-    const session = await getSession();
-    const dateObj = new Date(params.date + "T12:00:00");
-    const allSlots = await getAllSlotsOnDate(session, dateObj);
+    const elapsed = logger.time();
+    logger.info("Tool: book_court", { date: params.date, time: params.time, courtId: params.court_id });
 
-    const targetSlot = allSlots.find(
-      (s) => s.courtId === params.court_id && s.formattedStartTime === params.time && s.isAvailable,
-    );
+    try {
+      const session = await getSession();
+      const dateObj = new Date(params.date + "T12:00:00");
+      const allSlots = await getAllSlotsOnDate(session, dateObj);
 
-    if (!targetSlot) {
-      return text("Could not find the requested court/time slot, or it's no longer available.");
-    }
-
-    const result = await bookSlot(targetSlot, session);
-
-    if (result.success) {
-      return text(
-        `Successfully booked ${targetSlot.courtName} on ${targetSlot.formattedDate} at ${targetSlot.formattedStartTime}. Reservation ID: ${result.reservationId || "N/A"}`,
+      const targetSlot = allSlots.find(
+        (s) => s.courtId === params.court_id && s.formattedStartTime === params.time && s.isAvailable,
       );
-    }
 
-    return text(`Booking failed: ${result.error}`);
+      if (!targetSlot) {
+        logger.warn("Tool: book_court slot not found or unavailable", {
+          date: params.date,
+          time: params.time,
+          courtId: params.court_id,
+          latencyMs: elapsed(),
+        });
+        return text("Could not find the requested court/time slot, or it's no longer available.");
+      }
+
+      const result = await bookSlot(targetSlot, session);
+
+      if (result.success) {
+        logger.info("Tool: book_court succeeded", {
+          date: params.date,
+          time: params.time,
+          courtId: params.court_id,
+          courtName: targetSlot.courtName,
+          reservationId: result.reservationId,
+          latencyMs: elapsed(),
+        });
+        return text(
+          `Successfully booked ${targetSlot.courtName} on ${targetSlot.formattedDate} at ${targetSlot.formattedStartTime}. Reservation ID: ${result.reservationId || "N/A"}`,
+        );
+      }
+
+      logger.warn("Tool: book_court failed", {
+        date: params.date,
+        time: params.time,
+        courtId: params.court_id,
+        courtName: targetSlot.courtName,
+        error: result.error,
+        latencyMs: elapsed(),
+      });
+      return text(`Booking failed: ${result.error}`);
+    } catch (error) {
+      logger.error("Tool: book_court threw", {
+        date: params.date,
+        time: params.time,
+        courtId: params.court_id,
+        latencyMs: elapsed(),
+        error,
+      });
+      throw error;
+    }
   },
 };
 
@@ -163,7 +214,14 @@ const addToQueueTool: AgentTool<typeof addToQueueParams> = {
     "Add a booking request to the queue for automatic retry every 5 minutes. Use this when no courts are currently available.",
   parameters: addToQueueParams,
   execute: async (_toolCallId, params) => {
+    logger.info("Tool: add_to_queue", { date: params.date, timeFrom: params.time_from, timeTo: params.time_to });
     const entry = await addToQueue(params.date, params.time_from, params.time_to);
+    logger.info("Tool: add_to_queue entry created", {
+      id: entry.id,
+      date: params.date,
+      timeFrom: params.time_from,
+      timeTo: params.time_to,
+    });
     return text(
       `Added to queue (ID: ${entry.id}). I'll check every 5 minutes and book when a court becomes available.`,
     );
@@ -201,7 +259,9 @@ const removeFromQueueTool: AgentTool<typeof removeFromQueueParams> = {
   description: "Cancel a pending booking request from the queue.",
   parameters: removeFromQueueParams,
   execute: async (_toolCallId, params) => {
+    logger.info("Tool: remove_from_queue", { id: params.id });
     await removeFromQueue(params.id);
+    logger.info("Tool: remove_from_queue cancelled", { id: params.id });
     return text(`Removed queue entry ${params.id}.`);
   },
 };
