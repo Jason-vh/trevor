@@ -1,4 +1,5 @@
-import { Bot, webhookCallback } from "grammy";
+import { Bot } from "grammy";
+import type { Update } from "@grammyjs/types";
 
 import { runAgent } from "@/agent/agent";
 import { db } from "@/db";
@@ -64,7 +65,6 @@ async function main() {
   if (config.webhook) {
     // Production: webhook mode via Bun.serve
     const { domain, secret } = config.webhook;
-    const handleUpdate = webhookCallback(bot, "bun", { secretToken: secret });
 
     const server = Bun.serve({
       port: Number(Bun.env.PORT) || 3000,
@@ -76,8 +76,13 @@ async function main() {
         }
 
         if (url.pathname === "/webhook" && req.method === "POST") {
-          // Grammy's Bun adapter expects a slightly different Request type
-          return handleUpdate(req as unknown as Parameters<typeof handleUpdate>[0]);
+          if (req.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret) {
+            return new Response("Unauthorized", { status: 401 });
+          }
+          const update = (await req.json()) as Update;
+          // Respond immediately so Telegram doesn't retry on slow agent calls
+          bot.handleUpdate(update).catch((err) => logger.error("Error handling update", { error: err }));
+          return new Response("OK", { status: 200 });
         }
 
         if (url.pathname === "/history" && req.method === "GET") {
