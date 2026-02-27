@@ -8,6 +8,13 @@
       "when": 1771946007768,
       "tag": "0000_uneven_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772185732455,
+      "tag": "0001_eminent_wolf_cub",
+      "breakpoints": true
     }
   ]
 }

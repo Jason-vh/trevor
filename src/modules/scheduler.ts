@@ -5,7 +5,6 @@ import { buildBookingMessage } from "@/modules/notify";
 import { expirePastEntries, getProcessableEntries, setQueueStatus } from "@/modules/queue";
 import { getSession } from "@/modules/session-manager";
 import { filterByTimeRange, getAllSlotsOnDate } from "@/modules/slots";
-import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
 
 export async function processQueue(bot: Bot): Promise<void> {
@@ -54,12 +53,15 @@ export async function processQueue(bot: Bot): Promise<void> {
       if (result.success) {
         await setQueueStatus(entry.id, "booked");
         const message = buildBookingMessage(result);
-        for (const chatId of config.telegram.chatIds) {
-          await bot.api.sendMessage(chatId, message, {
-            parse_mode: "Markdown",
-          });
-        }
-        logger.info("Queue: entry booked", { id: entry.id, date: entry.date, reservationId: result.reservationId });
+        await bot.api.sendMessage(entry.chatId, message, {
+          parse_mode: "Markdown",
+        });
+        logger.info("Queue: entry booked", {
+          id: entry.id,
+          date: entry.date,
+          chatId: entry.chatId,
+          reservationId: result.reservationId,
+        });
         booked++;
       } else {
         await setQueueStatus(entry.id, "pending");

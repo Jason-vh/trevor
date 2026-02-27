@@ -2,6 +2,7 @@ import { jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 export const queue = pgTable("queue", {
   id: serial("id").primaryKey(),
+  chatId: text("chat_id").notNull(),
   date: text("date").notNull(),
   timeFrom: text("time_from").notNull(),
   timeTo: text("time_to").notNull(),

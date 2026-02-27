@@ -207,26 +207,28 @@ const listMyReservations: AgentTool<typeof emptyParams> = {
   },
 };
 
-const addToQueueTool: AgentTool<typeof addToQueueParams> = {
-  name: "add_to_queue",
-  label: "Add to Queue",
-  description:
-    "Add a booking request to the queue for automatic retry every 5 minutes. Use this when no courts are currently available.",
-  parameters: addToQueueParams,
-  execute: async (_toolCallId, params) => {
-    logger.info("Tool: add_to_queue", { date: params.date, timeFrom: params.time_from, timeTo: params.time_to });
-    const entry = await addToQueue(params.date, params.time_from, params.time_to);
-    logger.info("Tool: add_to_queue entry created", {
-      id: entry.id,
-      date: params.date,
-      timeFrom: params.time_from,
-      timeTo: params.time_to,
-    });
-    return text(
-      `Added to queue (ID: ${entry.id}). I'll check every 5 minutes and book when a court becomes available.`,
-    );
-  },
-};
+function makeAddToQueueTool(chatId: string): AgentTool<typeof addToQueueParams> {
+  return {
+    name: "add_to_queue",
+    label: "Add to Queue",
+    description:
+      "Add a booking request to the queue for automatic retry every 5 minutes. Use this when no courts are currently available.",
+    parameters: addToQueueParams,
+    execute: async (_toolCallId, params) => {
+      logger.info("Tool: add_to_queue", { date: params.date, timeFrom: params.time_from, timeTo: params.time_to });
+      const entry = await addToQueue(chatId, params.date, params.time_from, params.time_to);
+      logger.info("Tool: add_to_queue entry created", {
+        id: entry.id,
+        date: params.date,
+        timeFrom: params.time_from,
+        timeTo: params.time_to,
+      });
+      return text(
+        `Added to queue (ID: ${entry.id}). I'll check every 5 minutes and book when a court becomes available.`,
+      );
+    },
+  };
+}
 
 const listQueueTool: AgentTool<typeof emptyParams> = {
   name: "list_queue",
@@ -267,12 +269,14 @@ const removeFromQueueTool: AgentTool<typeof removeFromQueueParams> = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AgentTool array requires any for contravariant execute params
-export const tools: AgentTool<any>[] = [
-  getTodayDate,
-  checkAvailability,
-  bookCourt,
-  listMyReservations,
-  addToQueueTool,
-  listQueueTool,
-  removeFromQueueTool,
-];
+export function createTools(chatId: string): AgentTool<any>[] {
+  return [
+    getTodayDate,
+    checkAvailability,
+    bookCourt,
+    listMyReservations,
+    makeAddToQueueTool(chatId),
+    listQueueTool,
+    removeFromQueueTool,
+  ];
+}

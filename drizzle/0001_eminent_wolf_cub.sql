@@ -1,0 +1,1 @@
+ALTER TABLE "queue" ADD COLUMN "chat_id" text NOT NULL;

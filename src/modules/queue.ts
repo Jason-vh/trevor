@@ -4,10 +4,11 @@ import { db } from "@/db";
 import { queue } from "@/db/schema";
 import { logger } from "@/utils/logger";
 
-export async function addToQueue(date: string, timeFrom: string, timeTo: string) {
+export async function addToQueue(chatId: string, date: string, timeFrom: string, timeTo: string) {
   const [entry] = await db
     .insert(queue)
     .values({
+      chatId,
       date,
       timeFrom,
       timeTo,

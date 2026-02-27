@@ -5,7 +5,7 @@ import { loadHistory, saveMessage } from "@/modules/history";
 import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
 import { SYSTEM_PROMPT } from "./system-prompt";
-import { tools } from "./tools";
+import { createTools } from "./tools";
 
 const model = getModel("anthropic", "claude-sonnet-4-6");
 
@@ -20,7 +20,7 @@ export async function runAgent(chatId: string, userMessage: string): Promise<str
     initialState: {
       systemPrompt: SYSTEM_PROMPT,
       model,
-      tools,
+      tools: createTools(chatId),
       messages: history,
     },
     getApiKey: (provider) => {
