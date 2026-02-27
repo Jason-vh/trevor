@@ -1,8 +1,11 @@
 import { Bot, webhookCallback } from "grammy";
 
 import { runAgent } from "@/agent/agent";
+import { db } from "@/db";
+import { messages } from "@/db/schema";
 import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
+import { desc, eq } from "drizzle-orm";
 
 const bot = new Bot(config.telegram.token);
 
@@ -65,7 +68,7 @@ async function main() {
 
     const server = Bun.serve({
       port: Number(Bun.env.PORT) || 3000,
-      fetch(req) {
+      async fetch(req) {
         const url = new URL(req.url);
 
         if (url.pathname === "/health") {
@@ -75,6 +78,23 @@ async function main() {
         if (url.pathname === "/webhook" && req.method === "POST") {
           // Grammy's Bun adapter expects a slightly different Request type
           return handleUpdate(req as unknown as Parameters<typeof handleUpdate>[0]);
+        }
+
+        if (url.pathname === "/history" && req.method === "GET") {
+          if (req.headers.get("Authorization") !== `Bearer ${secret}`) {
+            return new Response("Unauthorized", { status: 401 });
+          }
+          const chatId = url.searchParams.get("chat_id");
+          if (!chatId) return new Response("Missing chat_id", { status: 400 });
+          const rows = await db
+            .select({ role: messages.role, content: messages.content, createdAt: messages.createdAt })
+            .from(messages)
+            .where(eq(messages.chatId, chatId))
+            .orderBy(desc(messages.createdAt))
+            .limit(20);
+          return new Response(JSON.stringify(rows.reverse()), {
+            headers: { "Content-Type": "application/json" },
+          });
         }
 
         return new Response("Not found", { status: 404 });
