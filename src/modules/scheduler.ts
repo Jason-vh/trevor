@@ -3,7 +3,7 @@ import type { Bot } from "grammy";
 import { bookSlot } from "@/modules/booking";
 import { confirmEvent, createConfirmedEvent } from "@/modules/calendar";
 import { buildBookingMessage } from "@/modules/notify";
-import { expirePastEntries, getProcessableEntries, setQueueStatus } from "@/modules/queue";
+import { expirePastEntries, getProcessableEntries, resetStaleProcessingEntries, setQueueStatus } from "@/modules/queue";
 import { getSession } from "@/modules/session-manager";
 import { filterByTimeRange, getAllSlotsOnDate } from "@/modules/slots";
 import { logger } from "@/utils/logger";
@@ -11,6 +11,7 @@ import { logger } from "@/utils/logger";
 export async function processQueue(bot: Bot): Promise<void> {
   const elapsed = logger.time();
 
+  await resetStaleProcessingEntries();
   await expirePastEntries();
 
   const entries = await getProcessableEntries();

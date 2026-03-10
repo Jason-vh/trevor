@@ -4,6 +4,20 @@ import { db } from "@/db";
 import { queue } from "@/db/schema";
 import { logger } from "@/utils/logger";
 
+export async function resetStaleProcessingEntries() {
+  const result = await db
+    .update(queue)
+    .set({ status: "pending", updatedAt: new Date() })
+    .where(eq(queue.status, "processing"))
+    .returning({ id: queue.id });
+  if (result.length > 0) {
+    logger.warn("Queue: reset stale processing entries", {
+      count: result.length,
+      ids: result.map((r) => r.id),
+    });
+  }
+}
+
 export async function addToQueue(chatId: string, date: string, timeFrom: string, timeTo: string) {
   const [entry] = await db
     .insert(queue)
