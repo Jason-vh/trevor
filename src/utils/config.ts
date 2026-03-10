@@ -17,6 +17,8 @@ export interface Config {
 
   calendarWebhookUrl?: string;
 
+  dashboardSecret?: string;
+
   webhook?: {
     domain: string;
     secret: string;
@@ -53,6 +55,7 @@ export const config: Config = {
   },
   databaseUrl: Bun.env.DATABASE_URL,
   calendarWebhookUrl: Bun.env["CALENDAR_WEBHOOK_URL"],
+  dashboardSecret: Bun.env.WEBHOOK_SECRET || undefined,
   webhook: Bun.env.WEBHOOK_DOMAIN
     ? {
         domain: Bun.env.WEBHOOK_DOMAIN,

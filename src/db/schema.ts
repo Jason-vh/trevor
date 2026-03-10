@@ -12,6 +12,12 @@ export const queue = pgTable("queue", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const metadata = pgTable("metadata", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
   chatId: text("chat_id").notNull(),

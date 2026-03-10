@@ -22,6 +22,13 @@
       "when": 1772187438731,
       "tag": "0002_equal_namora",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773158687275,
+      "tag": "0003_free_agent_brand",
+      "breakpoints": true
     }
   ]
 }

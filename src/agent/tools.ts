@@ -4,6 +4,7 @@ import { Type } from "@mariozechner/pi-ai";
 import { bookSlot } from "@/modules/booking";
 import { createConfirmedEvent, createTentativeEvent } from "@/modules/calendar";
 import { addToQueue, listPendingQueue, removeFromQueue, setQueueCalendarEventId } from "@/modules/queue";
+import { getUpcomingReservations } from "@/modules/reservations";
 import { getSession } from "@/modules/session-manager";
 import { getAllSlotsOnDate, filterByTimeRange } from "@/modules/slots";
 import { formatDateISO, getNextDays } from "@/utils/datetime";
@@ -182,30 +183,11 @@ const listMyReservations: AgentTool<typeof emptyParams> = {
   description: "Show the user's upcoming squash court reservations for the next 8 days.",
   parameters: emptyParams,
   execute: async () => {
-    const session = await getSession();
-    const days = getNextDays(8);
-    const ownBookings = [];
+    const result = await getUpcomingReservations();
 
-    for (const { date } of days) {
-      try {
-        const slots = await getAllSlotsOnDate(session, date);
-        const own = slots.filter((s) => s.isOwnBooking);
-        ownBookings.push(...own);
-      } catch {
-        // skip days that fail
-      }
-    }
-
-    if (ownBookings.length === 0) {
+    if (result.length === 0) {
       return text("No upcoming reservations found.");
     }
-
-    const result = ownBookings.map((s) => ({
-      courtName: s.courtName,
-      date: s.formattedDate,
-      dateISO: s.dateISO,
-      time: s.formattedStartTime,
-    }));
 
     return text(JSON.stringify(result, null, 2));
   },

@@ -1,5 +1,6 @@
 import { Bot } from "grammy";
 
+import { setMetadata } from "@/modules/metadata";
 import { processQueue } from "@/modules/scheduler";
 import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
@@ -14,6 +15,9 @@ logger.info("Cron: starting queue processing");
 for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
   try {
     await processQueue(bot);
+    await setMetadata("last_cron_run", new Date().toISOString()).catch((err) =>
+      logger.warn("Cron: failed to record last run", { error: err }),
+    );
     logger.info("Cron: done");
     process.exit(0);
   } catch (error) {
