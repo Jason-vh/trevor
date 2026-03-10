@@ -64,7 +64,7 @@ bot.on("message:text", async (ctx) => {
   }
 });
 
-const dashboardPath = new URL("../dashboard/index.html", import.meta.url).pathname;
+const dashboardPath = new URL("./dashboard/index.html", import.meta.url).pathname;
 
 function checkDashboardAuth(req: Request): Response | null {
   if (!config.dashboardSecret) {
