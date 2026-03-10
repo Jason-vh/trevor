@@ -7,7 +7,7 @@ import { addToQueue, listPendingQueue, removeFromQueue, setQueueCalendarEventId 
 import { getUpcomingReservations } from "@/modules/reservations";
 import { getSession } from "@/modules/session-manager";
 import { getAllSlotsOnDate, filterByTimeRange } from "@/modules/slots";
-import { formatDateISO, getNextDays } from "@/utils/datetime";
+import { formatDateISO } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
 
 function text(t: string) {
@@ -37,27 +37,6 @@ const addToQueueParams = Type.Object({
 const removeFromQueueParams = Type.Object({
   id: Type.Number({ description: "Queue entry ID to cancel" }),
 });
-
-const getTodayDate: AgentTool<typeof emptyParams> = {
-  name: "get_today_date",
-  label: "Get Today's Date",
-  description:
-    "Get today's date and the next 8 days with weekday names. Use this to resolve relative dates like 'next Tuesday' or 'morgen'.",
-  parameters: emptyParams,
-  execute: async () => {
-    const days = getNextDays(8);
-    const result = days.map(({ day, date }) => ({
-      weekday: day,
-      date: formatDateISO(date),
-      display: date.toLocaleDateString("en-US", {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-      }),
-    }));
-    return text(JSON.stringify(result, null, 2));
-  },
-};
 
 const checkAvailability: AgentTool<typeof checkAvailabilityParams> = {
   name: "check_availability",
@@ -201,6 +180,10 @@ function makeAddToQueueTool(chatId: string): AgentTool<typeof addToQueueParams> 
       "Add a booking request to the queue for automatic retry every 5 minutes. Use this when no courts are currently available.",
     parameters: addToQueueParams,
     execute: async (_toolCallId, params) => {
+      const today = formatDateISO(new Date());
+      if (params.date < today) {
+        return text(`Date ${params.date} is in the past. Today is ${today}. Please use a future date.`);
+      }
       logger.info("Tool: add_to_queue", { date: params.date, timeFrom: params.time_from, timeTo: params.time_to });
       const entry = await addToQueue(chatId, params.date, params.time_from, params.time_to);
       logger.info("Tool: add_to_queue entry created", {
@@ -259,7 +242,6 @@ const removeFromQueueTool: AgentTool<typeof removeFromQueueParams> = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AgentTool array requires any for contravariant execute params
 export function createTools(chatId: string): AgentTool<any>[] {
   return [
-    getTodayDate,
     checkAvailability,
     bookCourt,
     listMyReservations,
