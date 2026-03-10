@@ -191,18 +191,18 @@
 
       function renderQueue(data) {
         const el = document.getElementById("queue-content");
-        if (!data.length) {
-          el.innerHTML = '<p class="empty">No queue entries</p>';
+        const pending = data.filter((e) => e.status === "pending");
+        if (!pending.length) {
+          el.innerHTML = '<p class="empty">No pending requests</p>';
           return;
         }
         el.innerHTML = `<table>
-        <tr><th>Date</th><th>Time</th><th>Status</th></tr>
-        ${data
+        <tr><th>Date</th><th>Time</th></tr>
+        ${pending
           .map(
             (e) => `<tr>
           <td>${formatDate(e.date)}</td>
           <td>${e.timeFrom}-${e.timeTo}</td>
-          <td><span class="status status-${e.status}">${e.status}</span></td>
         </tr>`,
           )
           .join("")}
@@ -213,11 +213,11 @@
         const el = document.getElementById("status-content");
         if (!data.lastCronRun) {
           el.innerHTML =
-            '<div class="meta-row"><span class="meta-label">Last cron run</span><span class="meta-value">Never</span></div>';
+            '<div class="meta-row"><span class="meta-label">Last checked</span><span class="meta-value">Never</span></div>';
           return;
         }
         el.innerHTML = `<div class="meta-row">
-        <span class="meta-label">Last cron run</span>
+        <span class="meta-label">Last checked</span>
         <span class="meta-value">${relativeTime(data.lastCronRun.value)}</span>
       </div>`;
       }
