@@ -66,16 +66,6 @@ bot.on("message:text", async (ctx) => {
 
 const dashboardPath = new URL("./dashboard/index.html", import.meta.url).pathname;
 
-function checkDashboardAuth(req: Request): Response | null {
-  if (!config.dashboardSecret) {
-    return new Response("Dashboard auth not configured", { status: 503 });
-  }
-  if (req.headers.get("Authorization") !== `Bearer ${config.dashboardSecret}`) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-  return null;
-}
-
 async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url);
 
@@ -83,27 +73,21 @@ async function handleRequest(req: Request): Promise<Response> {
     return new Response("OK");
   }
 
-  if (url.pathname === "/dashboard") {
+  if (url.pathname === "/") {
     return new Response(Bun.file(dashboardPath));
   }
 
   if (url.pathname === "/api/reservations" && req.method === "GET") {
-    const authErr = checkDashboardAuth(req);
-    if (authErr) return authErr;
     const reservations = await getUpcomingReservations();
     return Response.json(reservations);
   }
 
   if (url.pathname === "/api/queue" && req.method === "GET") {
-    const authErr = checkDashboardAuth(req);
-    if (authErr) return authErr;
     const entries = await listRecentQueue();
     return Response.json(entries);
   }
 
   if (url.pathname === "/api/status" && req.method === "GET") {
-    const authErr = checkDashboardAuth(req);
-    if (authErr) return authErr;
     const lastCronRun = await getMetadata("last_cron_run");
     return Response.json({ lastCronRun });
   }

@@ -128,32 +128,6 @@
         padding: 8px 0;
       }
 
-      /* Auth form */
-      #auth-form {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        margin-top: 20px;
-      }
-
-      #auth-form input {
-        padding: 12px;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        font-size: 1rem;
-      }
-
-      #auth-form button {
-        padding: 12px;
-        background: #1a1a1a;
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        font-size: 1rem;
-        font-weight: 600;
-        cursor: pointer;
-      }
-
       .refresh-note {
         text-align: center;
         color: #bbb;
@@ -165,70 +139,27 @@
   <body>
     <h1>Trevor</h1>
 
-    <div id="auth-screen" style="display: none">
-      <div class="card">
-        <h2>Authentication</h2>
-        <form id="auth-form">
-          <input type="password" id="token-input" placeholder="Enter token" autocomplete="off" />
-          <button type="submit">Sign in</button>
-        </form>
-      </div>
+    <div class="card">
+      <h2>Upcoming Reservations</h2>
+      <div id="reservations-content"><p class="loading">Loading...</p></div>
     </div>
 
-    <div id="dashboard" style="display: none">
-      <div class="card">
-        <h2>Upcoming Reservations</h2>
-        <div id="reservations-content"><p class="loading">Loading...</p></div>
-      </div>
-
-      <div class="card">
-        <h2>Booking Queue</h2>
-        <div id="queue-content"><p class="loading">Loading...</p></div>
-      </div>
-
-      <div class="card">
-        <div id="status-content"><p class="loading">Loading...</p></div>
-      </div>
-
-      <p class="refresh-note">Auto-refreshes every 60s</p>
+    <div class="card">
+      <h2>Booking Queue</h2>
+      <div id="queue-content"><p class="loading">Loading...</p></div>
     </div>
+
+    <div class="card">
+      <div id="status-content"><p class="loading">Loading...</p></div>
+    </div>
+
+    <p class="refresh-note">Auto-refreshes every 60s</p>
 
     <script>
-      const TOKEN_KEY = "trevor_token";
-
-      function getToken() {
-        return localStorage.getItem(TOKEN_KEY);
-      }
-
-      function setToken(token) {
-        localStorage.setItem(TOKEN_KEY, token);
-      }
-
-      function clearToken() {
-        localStorage.removeItem(TOKEN_KEY);
-      }
-
       async function apiFetch(path) {
-        const res = await fetch(path, {
-          headers: { Authorization: `Bearer ${getToken()}` },
-        });
-        if (res.status === 401) {
-          clearToken();
-          showAuth();
-          throw new Error("Unauthorized");
-        }
+        const res = await fetch(path);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
-      }
-
-      function showAuth() {
-        document.getElementById("auth-screen").style.display = "";
-        document.getElementById("dashboard").style.display = "none";
-      }
-
-      function showDashboard() {
-        document.getElementById("auth-screen").style.display = "none";
-        document.getElementById("dashboard").style.display = "";
       }
 
       function relativeTime(iso) {
@@ -308,24 +239,8 @@
         else document.getElementById("status-content").innerHTML = '<p class="error">Failed to load</p>';
       }
 
-      // Auth form
-      document.getElementById("auth-form").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const token = document.getElementById("token-input").value.trim();
-        if (!token) return;
-        setToken(token);
-        showDashboard();
-        loadData();
-      });
-
-      // Init
-      if (getToken()) {
-        showDashboard();
-        loadData();
-        setInterval(loadData, 60000);
-      } else {
-        showAuth();
-      }
+      loadData();
+      setInterval(loadData, 60000);
     </script>
   </body>
 </html>
