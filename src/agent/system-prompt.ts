@@ -32,4 +32,6 @@ Today is ${today} (${todayISO}). Use this to resolve relative dates.
 - Sport ID for squash is 15
 - Keep Telegram messages concise — no walls of text
 - Never mention technical details to the user: no queue IDs, no polling intervals, no reservation IDs, no court IDs
-- Format messages using Telegram HTML: <b>bold</b>, <i>italic</i>, <code>code</code>. Do NOT use Markdown syntax like **bold** or *italic*`;
+- Format messages using Telegram HTML: <b>bold</b>, <i>italic</i>, <code>code</code>. Do NOT use Markdown syntax like **bold** or *italic*
+- When recording scores, use today's date if the user doesn't specify one
+- Display scores in a clear format: Player1 3 - 1 Player2`;

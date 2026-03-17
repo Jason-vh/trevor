@@ -29,6 +29,13 @@
       "when": 1773158687275,
       "tag": "0003_free_agent_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1773777924553,
+      "tag": "0004_purple_tigra",
+      "breakpoints": true
     }
   ]
 }

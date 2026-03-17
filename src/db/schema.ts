@@ -1,4 +1,4 @@
-import { jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 export const queue = pgTable("queue", {
   id: serial("id").primaryKey(),
@@ -16,6 +16,16 @@ export const metadata = pgTable("metadata", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const scores = pgTable("scores", {
+  id: serial("id").primaryKey(),
+  date: text("date").notNull(),
+  player1: text("player1").notNull(),
+  player2: text("player2").notNull(),
+  score1: integer("score1").notNull(),
+  score2: integer("score2").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const messages = pgTable("messages", {

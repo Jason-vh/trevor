@@ -4,6 +4,7 @@ import { Type } from "@mariozechner/pi-ai";
 import { bookSlot } from "@/modules/booking";
 import { createConfirmedEvent, createTentativeEvent } from "@/modules/calendar";
 import { addToQueue, listPendingQueue, removeFromQueue, setQueueCalendarEventId } from "@/modules/queue";
+import { recordScore, listScores } from "@/modules/scores";
 import { getUpcomingReservations } from "@/modules/reservations";
 import { getSession } from "@/modules/session-manager";
 import { getAllSlotsOnDate, filterByTimeRange } from "@/modules/slots";
@@ -36,6 +37,18 @@ const addToQueueParams = Type.Object({
 
 const removeFromQueueParams = Type.Object({
   id: Type.Number({ description: "Queue entry ID to cancel" }),
+});
+
+const recordScoreParams = Type.Object({
+  date: Type.String({ description: "Date of the session in YYYY-MM-DD format", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }),
+  player1: Type.String({ description: "Name of first player" }),
+  player2: Type.String({ description: "Name of second player" }),
+  score1: Type.Number({ description: "Number of games won by player1" }),
+  score2: Type.Number({ description: "Number of games won by player2" }),
+});
+
+const listScoresParams = Type.Object({
+  limit: Type.Optional(Type.Number({ description: "Number of recent scores to show (default 10)" })),
 });
 
 const checkAvailability: AgentTool<typeof checkAvailabilityParams> = {
@@ -239,6 +252,51 @@ const removeFromQueueTool: AgentTool<typeof removeFromQueueParams> = {
   },
 };
 
+const recordScoreTool: AgentTool<typeof recordScoreParams> = {
+  name: "record_score",
+  label: "Record Score",
+  description: "Record the score of a squash session between two players (e.g. Jason 3 - 1 Amp).",
+  parameters: recordScoreParams,
+  execute: async (_toolCallId, params) => {
+    const elapsed = logger.time();
+    logger.info("Tool: record_score", { ...params });
+    try {
+      const entry = await recordScore(params.date, params.player1, params.player2, params.score1, params.score2);
+      logger.info("Tool: record_score completed", { id: entry.id, latencyMs: elapsed() });
+      return text(
+        `Score recorded: ${entry.player1} ${entry.score1} - ${entry.score2} ${entry.player2} on ${entry.date}`,
+      );
+    } catch (error) {
+      logger.error("Tool: record_score failed", { latencyMs: elapsed(), error });
+      throw error;
+    }
+  },
+};
+
+const listScoresTool: AgentTool<typeof listScoresParams> = {
+  name: "list_scores",
+  label: "List Scores",
+  description: "Show recent squash session scores.",
+  parameters: listScoresParams,
+  execute: async (_toolCallId, params) => {
+    const elapsed = logger.time();
+    logger.info("Tool: list_scores", { limit: params.limit });
+    try {
+      const entries = await listScores(params.limit);
+      logger.info("Tool: list_scores completed", { count: entries.length, latencyMs: elapsed() });
+
+      if (entries.length === 0) {
+        return text("No scores recorded yet.");
+      }
+
+      return text(JSON.stringify(entries, null, 2));
+    } catch (error) {
+      logger.error("Tool: list_scores failed", { latencyMs: elapsed(), error });
+      throw error;
+    }
+  },
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AgentTool array requires any for contravariant execute params
 export function createTools(chatId: string): AgentTool<any>[] {
   return [
@@ -248,5 +306,7 @@ export function createTools(chatId: string): AgentTool<any>[] {
     makeAddToQueueTool(chatId),
     listQueueTool,
     removeFromQueueTool,
+    recordScoreTool,
+    listScoresTool,
   ];
 }
