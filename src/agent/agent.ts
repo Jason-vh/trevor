@@ -4,7 +4,7 @@ import { getModel } from "@mariozechner/pi-ai";
 import { loadHistory, saveMessage } from "@/modules/history";
 import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
-import { SYSTEM_PROMPT } from "./system-prompt";
+import { getSystemPrompt } from "./system-prompt";
 import { createTools } from "./tools";
 
 const model = getModel("anthropic", "claude-sonnet-4-6");
@@ -18,7 +18,7 @@ export async function runAgent(chatId: string, userMessage: string): Promise<str
 
   const agent = new Agent({
     initialState: {
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt: getSystemPrompt(),
       model,
       tools: createTools(chatId),
       messages: history,

@@ -2,6 +2,7 @@ import { and, desc, eq, lt } from "drizzle-orm";
 
 import { db } from "@/db";
 import { queue } from "@/db/schema";
+import { getCurrentDateISO } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
 
 export async function resetStaleProcessingEntries() {
@@ -57,7 +58,7 @@ export async function listRecentQueue() {
 }
 
 export async function expirePastEntries() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getCurrentDateISO();
   const result = await db
     .update(queue)
     .set({ status: "expired", updatedAt: new Date() })

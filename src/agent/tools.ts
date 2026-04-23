@@ -8,7 +8,7 @@ import { recordScore, listScores } from "@/modules/scores";
 import { getUpcomingReservations } from "@/modules/reservations";
 import { getSession } from "@/modules/session-manager";
 import { getAllSlotsOnDate, filterByTimeRange } from "@/modules/slots";
-import { formatDateISO } from "@/utils/datetime";
+import { getCurrentDateISO } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
 
 function text(t: string) {
@@ -193,7 +193,7 @@ function makeAddToQueueTool(chatId: string): AgentTool<typeof addToQueueParams> 
       "Add a booking request to the queue for automatic retry every 5 minutes. Use this when no courts are currently available.",
     parameters: addToQueueParams,
     execute: async (_toolCallId, params) => {
-      const today = formatDateISO(new Date());
+      const today = getCurrentDateISO();
       if (params.date < today) {
         return text(`Date ${params.date} is in the past. Today is ${today}. Please use a future date.`);
       }

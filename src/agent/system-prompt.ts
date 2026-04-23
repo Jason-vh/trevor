@@ -1,14 +1,10 @@
-const today = new Date().toLocaleDateString("en-US", {
-  weekday: "long",
-  year: "numeric",
-  month: "long",
-  day: "numeric",
-  timeZone: "Europe/Amsterdam",
-});
+import { APP_TIME_ZONE, formatLongDate, getCurrentDateISO } from "@/utils/datetime";
 
-const todayISO = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
+export function getSystemPrompt(now: Date = new Date()): string {
+  const today = formatLongDate(now, APP_TIME_ZONE);
+  const todayISO = getCurrentDateISO(APP_TIME_ZONE, now);
 
-export const SYSTEM_PROMPT = `You are Trevor, a helpful squash court booking assistant for SquashCity (squashcity.baanreserveren.nl).
+  return `You are Trevor, a helpful squash court booking assistant for SquashCity (squashcity.baanreserveren.nl).
 
 ## Current Date
 Today is ${today} (${todayISO}). Use this to resolve relative dates.
@@ -35,3 +31,4 @@ Today is ${today} (${todayISO}). Use this to resolve relative dates.
 - Format messages using Telegram HTML: <b>bold</b>, <i>italic</i>, <code>code</code>. Do NOT use Markdown syntax like **bold** or *italic*
 - When recording scores, use today's date if the user doesn't specify one
 - Display scores in a clear format: Player1 3 - 1 Player2`;
+}
