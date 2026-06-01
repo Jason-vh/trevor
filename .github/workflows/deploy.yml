@@ -1,0 +1,70 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: trevor-production
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DEPLOY_DIR: /home/exedev/apps/trevor
+
+jobs:
+  deploy:
+    name: Deploy to exe.dev VM
+    runs-on: [self-hosted, linux, trevor-prod]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Write production env file
+        run: |
+          cat > .env.production <<EOF
+          NODE_ENV=${{ secrets.NODE_ENV }}
+          TZ=${{ secrets.TZ }}
+          DATABASE_URL=postgresql://trevor:${{ secrets.TREVOR_DB_PASSWORD }}@postgres:5432/trevor
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}
+          WEBHOOK_DOMAIN=trevor.vhtm.eu
+          WEBHOOK_SECRET=${{ secrets.WEBHOOK_SECRET }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          SQUASH_CITY_USERNAME=${{ secrets.SQUASH_CITY_USERNAME }}
+          SQUASH_CITY_PASSWORD=${{ secrets.SQUASH_CITY_PASSWORD }}
+          AXIOM_TOKEN=${{ secrets.AXIOM_TOKEN }}
+          CALENDAR_WEBHOOK_URL=${{ secrets.CALENDAR_WEBHOOK_URL }}
+          TREVOR_APP_HOST_PORT=3007
+          COMPOSE_PROJECT_NAME=trevor
+          EOF
+
+      - name: Copy checkout to stable deploy directory
+        run: |
+          rm -rf "$DEPLOY_DIR.tmp"
+          mkdir -p "$DEPLOY_DIR.tmp"
+          cp -a . "$DEPLOY_DIR.tmp/"
+          rm -rf "$DEPLOY_DIR"
+          mv "$DEPLOY_DIR.tmp" "$DEPLOY_DIR"
+
+      - name: Build image
+        run: |
+          cd "$DEPLOY_DIR"
+          docker compose --env-file .env.production build
+
+      - name: Apply Drizzle migrations
+        run: |
+          cd "$DEPLOY_DIR"
+          docker compose --env-file .env.production run --rm app bunx drizzle-kit migrate
+
+      - name: Start app
+        run: |
+          cd "$DEPLOY_DIR"
+          docker compose --env-file .env.production up -d --remove-orphans
+          docker compose --env-file .env.production ps
+
+      - name: Reload Caddy
+        run: |
+          sudo /usr/bin/caddy validate --config /etc/caddy/Caddyfile
+          sudo /usr/bin/systemctl reload caddy

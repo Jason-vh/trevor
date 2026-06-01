@@ -11,7 +11,6 @@
     "db:migrate": "bunx drizzle-kit migrate",
     "fmt": "oxfmt --write src",
     "fmt:check": "oxfmt --check src",
-    "cron": "bun run src/cron.ts",
     "lint": "oxlint src"
   },
   "devDependencies": {
@@ -28,6 +27,7 @@
     "@mariozechner/pi-agent-core": "^0.54.2",
     "@mariozechner/pi-ai": "^0.54.2",
     "cheerio": "^1.1.2",
+    "croner": "^10.0.1",
     "drizzle-orm": "^0.45.1",
     "grammy": "^1.38.2",
     "postgres": "^3.4.8"

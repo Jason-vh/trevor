@@ -1,0 +1,6 @@
+#!/usr/bin/expect -f
+set timeout 10
+spawn ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 exe.dev
+expect "Please enter your email address:"
+send "jvanhattum@gmail.com\r"
+expect eof

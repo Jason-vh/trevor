@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      PORT: 3000
+    ports:
+      - "127.0.0.1:${TREVOR_APP_HOST_PORT:-3007}:3000"
+    networks:
+      - apps-net
+
+networks:
+  apps-net:
+    external: true

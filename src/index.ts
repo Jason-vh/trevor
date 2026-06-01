@@ -7,6 +7,7 @@ import { messages } from "@/db/schema";
 import { getMetadata } from "@/modules/metadata";
 import { listRecentQueue } from "@/modules/queue";
 import { getUpcomingReservations } from "@/modules/reservations";
+import { startCron } from "@/scheduler-cron";
 import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
 import { desc, eq } from "drizzle-orm";
@@ -145,7 +146,10 @@ async function main() {
 
   logger.info(`Server listening on port ${server.port}`);
 
+  const cronJob = startCron(bot);
+
   const shutdown = () => {
+    cronJob.stop();
     server.stop();
     if (!config.webhook) bot.stop();
     process.exit(0);
