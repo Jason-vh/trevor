@@ -54,10 +54,16 @@ bot.on("message:text", async (ctx) => {
 
   try {
     const response = await runAgent(chatId, messageText);
-    const replyOptions = isGroup
-      ? { parse_mode: "HTML" as const, reply_parameters: { message_id: ctx.message.message_id } }
-      : { parse_mode: "HTML" as const };
-    await ctx.reply(response, replyOptions);
+    const replyParams = isGroup ? { reply_parameters: { message_id: ctx.message.message_id } } : {};
+
+    // Send as a Telegram rich message (supports tables etc.). If the rich HTML
+    // fails to parse, fall back to a plain HTML message so a reply is never lost.
+    try {
+      await ctx.replyWithRichMessage({ html: response }, replyParams);
+    } catch (richError) {
+      logger.warn("Rich message send failed, falling back to plain HTML", { chatId, isGroup, error: richError });
+      await ctx.reply(response, { parse_mode: "HTML", ...replyParams });
+    }
     logger.info("Message handled", { chatId, isGroup, latencyMs: elapsed() });
   } catch (error) {
     logger.error("Error processing message", { chatId, isGroup, latencyMs: elapsed(), error });
