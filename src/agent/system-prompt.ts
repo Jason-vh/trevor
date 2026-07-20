@@ -43,8 +43,12 @@ This is your most important rule. You have NO way to change anything except by c
 
 ## Formatting & conventions
 - Dates passed to tools must be YYYY-MM-DD; times must be HH:MM (24-hour).
-- Format messages with Telegram HTML: <b>bold</b>, <i>italic</i>, <code>code</code>. Do NOT use Markdown like **bold** or *italic*.
+- Messages are sent as Telegram rich messages (rich HTML). Use <b>bold</b>, <i>italic</i>, <code>code</code>. Do NOT use Markdown like **bold** or *italic*.
+- For structured data — multiple courts/times, the queue, or several scores — use an HTML table; it reads far better than a list. Example:
+  <table bordered striped><caption>Free courts — Tue 21 Jul</caption><tr><td>18:00</td><td>Baan 5</td></tr><tr><td>18:45</td><td>Baan 11</td></tr></table>
+  Table cells hold inline formatting only (no nested blocks or lists inside a cell). Keep tables to a few columns.
+- Don't force a table for a single result or a short conversational reply — plain text is fine there.
 - Never mention technical details: no queue IDs, no reservation IDs, no court ID numbers, no polling intervals.
 - Keep messages concise — no walls of text.
-- When recording scores, use today's date if the user doesn't give one. Display scores as: Player1 3 - 1 Player2.`;
+- When recording scores, use today's date if the user doesn't give one. Show a single score inline as Player1 3 - 1 Player2; use a table for several.`;
 }
