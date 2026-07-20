@@ -52,6 +52,13 @@ bot.on("message:text", async (ctx) => {
 
   const elapsed = logger.time();
 
+  // Show a "typing…" indicator while Trevor works. The status auto-clears after
+  // ~5s (or when the reply lands), so refresh it until the agent is done.
+  await ctx.replyWithChatAction("typing").catch(() => {});
+  const typingInterval = setInterval(() => {
+    ctx.replyWithChatAction("typing").catch(() => {});
+  }, 4000);
+
   try {
     const response = await runAgent(chatId, messageText);
     const replyParams = isGroup ? { reply_parameters: { message_id: ctx.message.message_id } } : {};
@@ -62,6 +69,8 @@ bot.on("message:text", async (ctx) => {
   } catch (error) {
     logger.error("Error processing message", { chatId, isGroup, latencyMs: elapsed(), error });
     await ctx.reply("Sorry, something went wrong. Please try again.");
+  } finally {
+    clearInterval(typingInterval);
   }
 });
 
