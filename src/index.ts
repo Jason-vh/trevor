@@ -14,20 +14,6 @@ import { desc, eq } from "drizzle-orm";
 
 const bot = new Bot(config.telegram.token);
 
-// Strip HTML tags to readable plain text — used only as a last-resort fallback
-// when a rich message (e.g. a table) fails to send.
-function htmlToPlainText(html: string): string {
-  return html
-    .replace(/<\/(tr|table|caption|p|div)>/gi, "\n")
-    .replace(/<\/td>/gi, "  ")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
 // Only respond to allowed chats. In groups, only respond when mentioned.
 bot.on("message:text", async (ctx) => {
   const chatId = String(ctx.chat.id);
@@ -69,22 +55,9 @@ bot.on("message:text", async (ctx) => {
   try {
     const response = await runAgent(chatId, messageText);
     const replyParams = isGroup ? { reply_parameters: { message_id: ctx.message.message_id } } : {};
-
-    // Rich messages render text larger (article-style), which looks off for
-    // normal chat. Only use them when the reply actually needs a table;
-    // everything else goes out as a normal-sized HTML message.
-    if (/<table[\s>]/i.test(response)) {
-      try {
-        await ctx.replyWithRichMessage({ html: response }, replyParams);
-      } catch (richError) {
-        // parse_mode HTML can't render <table>, so strip tags to plain text
-        // as a last resort — a reply is never lost.
-        logger.warn("Rich message send failed, falling back to plain text", { chatId, isGroup, error: richError });
-        await ctx.reply(htmlToPlainText(response), replyParams);
-      }
-    } else {
-      await ctx.reply(response, { parse_mode: "HTML" as const, ...replyParams });
-    }
+    // Plain text only — no parse_mode, no rich messages. Trevor formats with
+    // line breaks, bullets and emoji (see the system prompt).
+    await ctx.reply(response, replyParams);
     logger.info("Message handled", { chatId, isGroup, latencyMs: elapsed() });
   } catch (error) {
     logger.error("Error processing message", { chatId, isGroup, latencyMs: elapsed(), error });
