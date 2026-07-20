@@ -17,5 +17,6 @@ export async function getUpcomingReservations() {
     date: s.formattedDate,
     dateISO: s.dateISO,
     time: s.formattedStartTime,
+    reservationId: s.reservationId,
   }));
 }

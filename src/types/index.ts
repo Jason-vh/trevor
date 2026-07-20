@@ -18,6 +18,8 @@ export type CourtAvailability = {
 
   // booking details
   utc: string;
+  // reservation ID, present only for own bookings (used to cancel)
+  reservationId?: string;
 
   // other details
   isAvailable: boolean;

@@ -42,3 +42,12 @@ export async function confirmEvent(eventId: string, courtName: string, date: str
 export async function createConfirmedEvent(courtName: string, date: string, time: string): Promise<void> {
   await postToCalendar({ action: "createConfirmed", title: confirmedTitle(courtName), date, time });
 }
+
+/**
+ * Removes the calendar event for a booking, matched by date + start time.
+ * Best-effort: requires the calendar webhook (Apps Script) to handle the
+ * "delete" action; a no-op if the webhook is unset or doesn't support it.
+ */
+export async function deleteEvent(date: string, time: string): Promise<void> {
+  await postToCalendar({ action: "delete", date, time });
+}

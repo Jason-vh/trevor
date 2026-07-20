@@ -82,6 +82,10 @@ export function getSlotsFromHTML(html: string, dateISO: string): CourtAvailabili
         throw new Error(`Court name not found for court ID ${courtId}`);
       }
 
+      // Taken cells carry the reservation ID in the `slot` attribute
+      // (e.g. slot="13040722"); we only need it for our own bookings, to cancel.
+      const reservationId = isOwnBooking ? $(cell).attr("slot") : undefined;
+
       const slot: CourtAvailability = {
         courtId,
         courtName,
@@ -93,6 +97,7 @@ export function getSlotsFromHTML(html: string, dateISO: string): CourtAvailabili
         formattedDate,
         dateISO,
         utc,
+        reservationId,
       };
 
       slots.push(slot);

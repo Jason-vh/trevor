@@ -2,7 +2,8 @@ import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Type } from "@mariozechner/pi-ai";
 
 import { bookSlot } from "@/modules/booking";
-import { createConfirmedEvent, createTentativeEvent } from "@/modules/calendar";
+import { cancelReservation } from "@/modules/cancel";
+import { createConfirmedEvent, createTentativeEvent, deleteEvent } from "@/modules/calendar";
 import { addToQueue, listPendingQueue, removeFromQueue, setQueueCalendarEventId } from "@/modules/queue";
 import { recordScore, listScores } from "@/modules/scores";
 import { getUpcomingReservations } from "@/modules/reservations";
@@ -49,6 +50,12 @@ const recordScoreParams = Type.Object({
 
 const listScoresParams = Type.Object({
   limit: Type.Optional(Type.Number({ description: "Number of recent scores to show (default 10)" })),
+});
+
+const cancelReservationParams = Type.Object({
+  reservation_id: Type.String({ description: "Reservation ID from list_my_reservations" }),
+  date: Type.String({ description: "Reservation date in YYYY-MM-DD (for calendar cleanup)" }),
+  time: Type.String({ description: "Reservation start time in HH:MM (for calendar cleanup)" }),
 });
 
 const checkAvailability: AgentTool<typeof checkAvailabilityParams> = {
@@ -297,6 +304,45 @@ const listScoresTool: AgentTool<typeof listScoresParams> = {
   },
 };
 
+const cancelReservationTool: AgentTool<typeof cancelReservationParams> = {
+  name: "cancel_reservation",
+  label: "Cancel Reservation",
+  description:
+    "Cancel one of the user's existing court reservations. Get the reservation_id from list_my_reservations first, and confirm with the user before calling this.",
+  parameters: cancelReservationParams,
+  execute: async (_toolCallId, params) => {
+    const elapsed = logger.time();
+    logger.info("Tool: cancel_reservation", { reservationId: params.reservation_id });
+    try {
+      const session = await getSession();
+      const result = await cancelReservation(params.reservation_id, session);
+
+      if (!result.success) {
+        logger.warn("Tool: cancel_reservation failed", {
+          reservationId: params.reservation_id,
+          error: result.error,
+          latencyMs: elapsed(),
+        });
+        return text(`Could not cancel the reservation: ${result.error}`);
+      }
+
+      // Best-effort: remove the matching calendar event
+      await deleteEvent(params.date, params.time).catch((err) =>
+        logger.warn("Tool: cancel_reservation calendar delete failed", { error: err }),
+      );
+
+      logger.info("Tool: cancel_reservation succeeded", {
+        reservationId: params.reservation_id,
+        latencyMs: elapsed(),
+      });
+      return text(`Cancelled the reservation on ${params.date} at ${params.time}.`);
+    } catch (error) {
+      logger.error("Tool: cancel_reservation threw", { reservationId: params.reservation_id, error });
+      throw error;
+    }
+  },
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AgentTool array requires any for contravariant execute params
 export function createTools(chatId: string): AgentTool<any>[] {
   return [
@@ -308,5 +354,6 @@ export function createTools(chatId: string): AgentTool<any>[] {
     removeFromQueueTool,
     recordScoreTool,
     listScoresTool,
+    cancelReservationTool,
   ];
 }
