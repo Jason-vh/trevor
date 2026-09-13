@@ -2,10 +2,12 @@ import type { Bot } from "grammy";
 
 import { bookSlot } from "@/modules/booking";
 import { confirmEvent, createConfirmedEvent } from "@/modules/calendar";
+import { getCourtTiers } from "@/modules/court-preferences";
 import { buildBookingMessage } from "@/modules/notify";
 import { expirePastEntries, getProcessableEntries, resetStaleProcessingEntries, setQueueStatus } from "@/modules/queue";
 import { getSession } from "@/modules/session-manager";
 import { filterByTimeRange, getAllSlotsOnDate } from "@/modules/slots";
+import { sortSlotsByPreference } from "@/utils/courts";
 import { logger } from "@/utils/logger";
 
 export async function processQueue(bot: Bot): Promise<void> {
@@ -24,6 +26,7 @@ export async function processQueue(bot: Bot): Promise<void> {
   logger.info("Queue: starting run", { entryCount: entries.length });
 
   const session = await getSession();
+  const courtTiers = await getCourtTiers();
 
   let booked = 0;
   let failed = 0;
@@ -36,7 +39,10 @@ export async function processQueue(bot: Bot): Promise<void> {
       const dateObj = new Date(entry.date + "T12:00:00");
       const allSlots = await getAllSlotsOnDate(session, dateObj);
       const filtered = filterByTimeRange(allSlots, entry.timeFrom, entry.timeTo);
-      const available = filtered.filter((s) => s.isAvailable);
+      const available = sortSlotsByPreference(
+        filtered.filter((s) => s.isAvailable),
+        courtTiers,
+      );
 
       if (available.length === 0) {
         logger.info("Queue: no available slots for entry", {

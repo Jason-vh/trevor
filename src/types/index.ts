@@ -27,6 +27,8 @@ export type CourtAvailability = {
   offPeak: boolean;
 };
 
+export type CourtTier = "preferred" | "neutral" | "avoided";
+
 export enum Weekday {
   MON = "mon",
   TUE = "tue",

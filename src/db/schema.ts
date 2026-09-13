@@ -28,6 +28,12 @@ export const scores = pgTable("scores", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const courtPreferences = pgTable("court_preferences", {
+  court: text("court").primaryKey(),
+  tier: text("tier").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
   chatId: text("chat_id").notNull(),

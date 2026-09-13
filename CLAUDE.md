@@ -58,7 +58,7 @@ The target website uses **server-side rendered HTML** (not a SPA), so:
 
 **Session Management**: Cookie-based auth stored in-memory with 30min TTL cache (src/modules/session-manager.ts). The `Session` interface (src/types/index.ts:1) holds a `cookies[]` array extracted from login response headers using Bun's `response.headers.getSetCookie()`.
 
-**Agent Architecture**: Each incoming message creates a fresh pi-agent-core `Agent` instance with conversation history loaded from Postgres. The agent has 7 tools for checking availability, booking courts, managing the queue, etc. Conversation history is stored as user/assistant text messages in the `messages` table.
+**Agent Architecture**: Each incoming message creates a fresh pi-agent-core `Agent` instance with conversation history loaded from Postgres. The agent has tools for checking availability, booking courts, managing the queue, etc. Conversation history is stored as user/assistant text messages in the `messages` table.
 
 **Database**: Postgres via Drizzle ORM. Two tables: `queue` (booking requests for background retry) and `messages` (conversation history per chat). Migrations in `drizzle/`.
 
@@ -82,17 +82,19 @@ Agent orchestration:
 
 ### src/agent/tools.ts
 
-7 tools using TypeBox schemas + execute functions that call existing modules:
+Tools using TypeBox schemas + execute functions that call existing modules:
 
 | Tool | Purpose |
 |------|---------|
-| `get_today_date` | Resolve relative dates ("next Tuesday") → YYYY-MM-DD |
-| `check_availability` | Show free courts for a date/time range |
+| `check_availability` | Show free courts for a date/time range, best court first |
 | `book_court` | Execute the 3-step booking flow |
 | `list_my_reservations` | Show user's upcoming bookings (next 8 days) |
+| `cancel_reservation` | Cancel an existing reservation (+ calendar cleanup) |
 | `add_to_queue` | Queue a request for periodic retry |
 | `list_queue` | Show pending queue entries |
 | `remove_from_queue` | Cancel a queue entry |
+| `record_score` / `list_scores` | Record and show match scores |
+| `list_court_preferences` / `set_court_preference` | Read and change which courts are preferred or avoided |
 
 ### src/agent/system-prompt.ts
 
@@ -104,6 +106,9 @@ Drizzle table definitions:
 
 - `queue` — booking requests with status lifecycle (pending → processing → booked/expired/cancelled)
 - `messages` — conversation history per chat_id (role + jsonb content)
+- `court_preferences` — court name → tier (`preferred` / `neutral` / `avoided`); only exceptions are stored, absent courts are neutral
+- `scores` — recorded match results
+- `metadata` — key/value store
 
 ### src/db/index.ts
 
@@ -177,6 +182,16 @@ Telegram message formatting:
 
 - `buildMessage()` - Formats changed slots as Markdown (groups by date, then time)
 - `buildBookingMessage()` - Formats booking confirmations/failures (used by scheduler)
+
+### src/modules/court-preferences.ts
+
+Court preference CRUD against Postgres via Drizzle:
+
+- `getCourtTiers()` — court name → tier map, used to rank free slots
+- `setCourtTier()` — upsert a court's tier
+- `listCourtPreferences()` — non-neutral courts, best first
+
+The pure ranking logic lives in src/utils/courts.ts: `sortSlotsByPreference()` orders slots by date, then time, then tier — an earlier slot always beats a nicer court. Both the queue processor and `check_availability` use it.
 
 ### src/modules/queue.ts
 

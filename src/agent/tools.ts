@@ -4,11 +4,13 @@ import { Type } from "@mariozechner/pi-ai";
 import { bookSlot } from "@/modules/booking";
 import { cancelReservation } from "@/modules/cancel";
 import { createConfirmedEvent, createTentativeEvent, deleteEvent } from "@/modules/calendar";
+import { getCourtTiers, listCourtPreferences, setCourtTier } from "@/modules/court-preferences";
 import { addToQueue, listPendingQueue, removeFromQueue, setQueueCalendarEventId } from "@/modules/queue";
 import { recordScore, listScores } from "@/modules/scores";
 import { getUpcomingReservations } from "@/modules/reservations";
 import { getSession } from "@/modules/session-manager";
 import { getAllSlotsOnDate, filterByTimeRange } from "@/modules/slots";
+import { getTier, normalizeCourtName, sortSlotsByPreference } from "@/utils/courts";
 import { getCurrentDateISO } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
 
@@ -52,6 +54,13 @@ const listScoresParams = Type.Object({
   limit: Type.Optional(Type.Number({ description: "Number of recent scores to show (default 10)" })),
 });
 
+const setCourtPreferenceParams = Type.Object({
+  court: Type.String({ description: 'Court name or number, e.g. "Baan 12" or "12"' }),
+  tier: Type.Union([Type.Literal("preferred"), Type.Literal("neutral"), Type.Literal("avoided")], {
+    description: "preferred = book first, avoided = book only as last resort, neutral = no preference",
+  }),
+});
+
 const cancelReservationParams = Type.Object({
   reservation_id: Type.String({ description: "Reservation ID from list_my_reservations" }),
   date: Type.String({ description: "Reservation date in YYYY-MM-DD (for calendar cleanup)" }),
@@ -79,7 +88,11 @@ const checkAvailability: AgentTool<typeof checkAvailabilityParams> = {
         slots = filterByTimeRange(allSlots, params.time_from, params.time_from);
       }
 
-      const available = slots.filter((s) => s.isAvailable);
+      const courtTiers = await getCourtTiers();
+      const available = sortSlotsByPreference(
+        slots.filter((s) => s.isAvailable),
+        courtTiers,
+      );
       const result = available.map((s) => ({
         courtName: s.courtName,
         courtId: s.courtId,
@@ -87,6 +100,7 @@ const checkAvailability: AgentTool<typeof checkAvailabilityParams> = {
         date: s.formattedDate,
         dateISO: s.dateISO,
         offPeak: s.offPeak,
+        preference: getTier(courtTiers, s.courtName),
       }));
 
       logger.info("Tool: check_availability completed", {
@@ -343,6 +357,41 @@ const cancelReservationTool: AgentTool<typeof cancelReservationParams> = {
   },
 };
 
+const listCourtPreferencesTool: AgentTool<typeof emptyParams> = {
+  name: "list_court_preferences",
+  label: "List Court Preferences",
+  description: "Show which courts are preferred and which are avoided when booking.",
+  parameters: emptyParams,
+  execute: async () => {
+    const preferences = await listCourtPreferences();
+
+    if (preferences.length === 0) {
+      return text("No court preferences set — all courts are treated equally.");
+    }
+
+    return text(JSON.stringify(preferences, null, 2));
+  },
+};
+
+const setCourtPreferenceTool: AgentTool<typeof setCourtPreferenceParams> = {
+  name: "set_court_preference",
+  label: "Set Court Preference",
+  description:
+    "Set how much a court is favoured when several are free at the same time. Use when the user says they like or dislike a court.",
+  parameters: setCourtPreferenceParams,
+  execute: async (_toolCallId, params) => {
+    const court = normalizeCourtName(params.court);
+
+    if (!court) {
+      return text(`"${params.court}" is not a court name. Courts are named Baan 1 through Baan 13.`);
+    }
+
+    logger.info("Tool: set_court_preference", { court, tier: params.tier });
+    await setCourtTier(court, params.tier);
+    return text(`${court} is now ${params.tier}.`);
+  },
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AgentTool array requires any for contravariant execute params
 export function createTools(chatId: string): AgentTool<any>[] {
   return [
@@ -355,5 +404,7 @@ export function createTools(chatId: string): AgentTool<any>[] {
     recordScoreTool,
     listScoresTool,
     cancelReservationTool,
+    listCourtPreferencesTool,
+    setCourtPreferenceTool,
   ];
 }
