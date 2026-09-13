@@ -7,6 +7,7 @@ export interface Config {
   telegram: {
     token: string;
     chatIds: Set<string>;
+    groupChatIds: Set<string>;
   };
 
   anthropic: {
@@ -39,6 +40,9 @@ if (!Bun.env.DATABASE_URL) {
   throw new Error("Missing DATABASE_URL");
 }
 
+const chatIds = new Set(Bun.env.TELEGRAM_CHAT_ID.split(",").map((id) => id.trim()));
+const groupChatIds = new Set([...chatIds].filter((id) => id.startsWith("-")));
+
 export const config: Config = {
   squashCityCredentials: {
     username: Bun.env.SQUASH_CITY_USERNAME,
@@ -46,7 +50,8 @@ export const config: Config = {
   },
   telegram: {
     token: Bun.env.TELEGRAM_BOT_TOKEN,
-    chatIds: new Set(Bun.env.TELEGRAM_CHAT_ID.split(",").map((id) => id.trim())),
+    chatIds,
+    groupChatIds,
   },
   anthropic: {
     apiKey: Bun.env.ANTHROPIC_API_KEY,

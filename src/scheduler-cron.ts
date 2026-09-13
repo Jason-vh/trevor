@@ -2,6 +2,7 @@ import { Bot } from "grammy";
 import { Cron } from "croner";
 
 import { setMetadata } from "@/modules/metadata";
+import { sendDailyReminders } from "@/modules/reminders";
 import { processQueue } from "@/modules/scheduler";
 import { logger } from "@/utils/logger";
 
@@ -12,6 +13,7 @@ async function runTick(bot: Bot) {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       await processQueue(bot);
+      await sendDailyReminders(bot).catch((error) => logger.error("Cron: reminders failed", { error }));
       await setMetadata("last_cron_run", new Date().toISOString()).catch((err) =>
         logger.warn("Cron: failed to record last run", { error: err }),
       );

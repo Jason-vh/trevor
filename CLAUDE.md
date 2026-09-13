@@ -200,6 +200,14 @@ Queue CRUD operations against Postgres via Drizzle:
 - `addToQueue()` / `listPendingQueue()` / `removeFromQueue()`
 - `getProcessableEntries()` / `setQueueStatus()` / `expirePastEntries()`
 
+### src/modules/reminders.ts
+
+Morning reminder for today's bookings, called from every cron tick:
+
+- Runs once per day, on the first tick at or after 09:00 Amsterdam time (gate + `metadata.reminders_sent_date`, so a restart around 09:00 can't skip or duplicate it)
+- Fetches today's own bookings and messages the group chats (`config.telegram.groupChatIds` — negative Telegram ids); silent when nothing is booked
+- Pure gate and message formatting live in src/utils/reminders.ts
+
 ### src/modules/history.ts
 
 Conversation history CRUD against Postgres via Drizzle:

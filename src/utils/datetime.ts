@@ -10,6 +10,10 @@ export function getCurrentDateISO(timeZone: string = APP_TIME_ZONE, now: Date = 
   return formatDateISO(now, timeZone);
 }
 
+export function getCurrentTime(timeZone: string = APP_TIME_ZONE, now: Date = new Date()): string {
+  return now.toLocaleTimeString("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
 export function formatLongDate(date: Date, timeZone: string = APP_TIME_ZONE): string {
   return date.toLocaleDateString("en-US", {
     weekday: "long",
