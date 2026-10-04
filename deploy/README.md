@@ -48,7 +48,6 @@ ssh exe.dev domain add vhtm-eu trevor.vhtm.eu
 | `WEBHOOK_SECRET` | Random token sent in `X-Telegram-Bot-Api-Secret-Token`; also doubles as `/history` bearer. |
 | `ANTHROPIC_API_KEY` | LLM. |
 | `SQUASH_CITY_USERNAME`, `SQUASH_CITY_PASSWORD` | SquashCity reservation site login. |
-| `AXIOM_TOKEN` | Axiom log shipping. |
 | `CALENDAR_WEBHOOK_URL` | Google Apps Script Calendar sync (optional). |
 | `NODE_ENV`, `TZ` | Runtime config. |
 

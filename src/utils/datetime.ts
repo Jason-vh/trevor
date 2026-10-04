@@ -1,5 +1,3 @@
-import type { Weekday } from "@/types";
-
 export const APP_TIME_ZONE = "Europe/Amsterdam";
 
 export function formatDateISO(date: Date, timeZone: string = APP_TIME_ZONE): string {
@@ -29,15 +27,10 @@ export function getTimeInMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
-export function getNextDays(count: number): { day: Weekday; date: Date }[] {
-  const days: { day: Weekday; date: Date }[] = [];
-  for (let i = 0; i < count; i++) {
+export function getNextDays(count: number): Date[] {
+  return Array.from({ length: count }, (_, offset) => {
     const date = new Date();
-    date.setDate(date.getDate() + i);
-
-    const day = date.toLocaleDateString("en-US", { weekday: "short" }).toLowerCase() as Weekday;
-    days.push({ day, date });
-  }
-
-  return days;
+    date.setDate(date.getDate() + offset);
+    return date;
+  });
 }

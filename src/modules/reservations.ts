@@ -6,7 +6,7 @@ export async function getUpcomingReservations() {
   const session = await getSession();
   const days = getNextDays(8);
 
-  const results = await Promise.allSettled(days.map(({ date }) => getAllSlotsOnDate(session, date)));
+  const results = await Promise.allSettled(days.map((date) => getAllSlotsOnDate(session, date)));
 
   const ownBookings = results.flatMap((result) =>
     result.status === "fulfilled" ? result.value.filter((s) => s.isOwnBooking) : [],

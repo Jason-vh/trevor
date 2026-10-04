@@ -21,61 +21,6 @@ export function filterByTimeRange(slots: CourtAvailability[], startTime: string,
   });
 }
 
-function groupByDate(slots: CourtAvailability[]) {
-  return slots.reduce((acc, slot) => {
-    const key = slot.formattedDate;
-    const existing = acc.get(key);
-
-    if (existing) {
-      existing.push(slot);
-    } else {
-      acc.set(key, [slot]);
-    }
-
-    return acc;
-  }, new Map<string, CourtAvailability[]>());
-}
-
-function groupByTime(slots: CourtAvailability[]) {
-  return slots.reduce((acc, slot) => {
-    const key = slot.formattedStartTime;
-    const existing = acc.get(key);
-
-    if (existing) {
-      existing.push(slot);
-    } else {
-      acc.set(key, [slot]);
-    }
-
-    return acc;
-  }, new Map<string, CourtAvailability[]>());
-}
-
-/**
- * We filter out slots: first by time range, then by open slots
- * and then we group the open slots by date and time
- */
-export function filterAndGroupSlots(
-  slots: CourtAvailability[],
-  startTime: string,
-  endTime: string,
-): Map<string, Map<string, CourtAvailability[]>> {
-  const filteredSlots = filterByTimeRange(slots, startTime, endTime).filter((slot) => slot.isAvailable);
-
-  const groupedByDate = groupByDate(filteredSlots);
-
-  const groupedByTime: Map<string, Map<string, CourtAvailability[]>> = new Map();
-  for (const [date, slotsForDate] of groupedByDate) {
-    const groupedByTimeForDate = groupByTime(slotsForDate);
-    groupedByTime.set(date, groupedByTimeForDate);
-  }
-
-  return groupedByTime;
-}
-
-/**
- * Fetch open slots that fall in a given time range, grouped by time
- */
 export async function getAllSlotsOnDate(session: Session, date: Date): Promise<CourtAvailability[]> {
   const dateISO = formatDateISO(date);
   const url = getURL(dateISO);

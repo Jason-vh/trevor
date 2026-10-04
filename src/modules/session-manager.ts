@@ -20,9 +20,3 @@ export async function getSession(): Promise<Session> {
   sessionTimestamp = now;
   return cachedSession;
 }
-
-export function invalidateSession(): void {
-  logger.info("Session: invalidated");
-  cachedSession = null;
-  sessionTimestamp = 0;
-}

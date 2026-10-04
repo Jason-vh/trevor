@@ -1,4 +1,4 @@
-import { SQUASH_CITY_URL } from "@/constants";
+import { SQUASH_CITY_URL, USER_AGENT } from "@/constants";
 import type { Session } from "@/types";
 import { logger } from "@/utils/logger";
 
@@ -11,7 +11,7 @@ export async function getPage(url: string, session: Session): Promise<string> {
   logger.debug("HTTP GET", { url });
 
   const headers: Bun.HeadersInit = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    "User-Agent": USER_AGENT,
     Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     Cookie: getCookieHeader(session),
   };
@@ -41,7 +41,7 @@ export async function postPage(url: string, body: string, session: Session, refe
   logger.debug("HTTP POST", { url });
 
   const headers: Bun.HeadersInit = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    "User-Agent": USER_AGENT,
     "Content-Type": "application/x-www-form-urlencoded",
     Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     Cookie: getCookieHeader(session),

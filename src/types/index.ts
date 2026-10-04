@@ -29,23 +29,6 @@ export type CourtAvailability = {
 
 export type CourtTier = "preferred" | "neutral" | "avoided";
 
-export enum Weekday {
-  MON = "mon",
-  TUE = "tue",
-  WED = "wed",
-  THU = "thu",
-  FRI = "fri",
-  SAT = "sat",
-  SUN = "sun",
-}
-
-export interface Args {
-  from: string;
-  to: string;
-  days: Weekday[];
-  book: boolean;
-}
-
 export type BookingResult = {
   success: boolean;
   slot: CourtAvailability;

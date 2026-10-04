@@ -1,4 +1,4 @@
-import { SQUASH_CITY_URL } from "@/constants";
+import { SQUASH_CITY_URL, USER_AGENT } from "@/constants";
 import type { Session } from "@/types";
 import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
@@ -20,7 +20,7 @@ export async function login(): Promise<Session> {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      "User-Agent": USER_AGENT,
     },
     body: formData.toString(),
     redirect: "manual", // Handle redirects manually to capture cookies

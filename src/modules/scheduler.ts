@@ -3,12 +3,16 @@ import type { Bot } from "grammy";
 import { bookSlot } from "@/modules/booking";
 import { confirmEvent, createConfirmedEvent } from "@/modules/calendar";
 import { getCourtTiers } from "@/modules/court-preferences";
-import { buildBookingMessage } from "@/modules/notify";
 import { expirePastEntries, getProcessableEntries, resetStaleProcessingEntries, setQueueStatus } from "@/modules/queue";
 import { getSession } from "@/modules/session-manager";
 import { filterByTimeRange, getAllSlotsOnDate } from "@/modules/slots";
+import type { CourtAvailability } from "@/types";
 import { sortSlotsByPreference } from "@/utils/courts";
 import { logger } from "@/utils/logger";
+
+function buildBookedMessage(slot: CourtAvailability): string {
+  return `✅ A court opened up, so I booked it!\n\n🏸 ${slot.courtName}\n🗓️ ${slot.formattedDate}\n🕐 ${slot.formattedStartTime}`;
+}
 
 export async function processQueue(bot: Bot): Promise<void> {
   const elapsed = logger.time();
@@ -74,10 +78,7 @@ export async function processQueue(bot: Bot): Promise<void> {
         } catch (calendarError) {
           logger.warn("Queue: calendar update failed", { id: entry.id, error: calendarError });
         }
-        const message = buildBookingMessage(result);
-        await bot.api.sendMessage(entry.chatId, message, {
-          parse_mode: "Markdown",
-        });
+        await bot.api.sendMessage(entry.chatId, buildBookedMessage(result.slot));
         logger.info("Queue: entry booked", {
           id: entry.id,
           date: entry.date,
