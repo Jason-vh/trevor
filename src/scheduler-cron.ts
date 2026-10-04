@@ -17,7 +17,7 @@ async function runTick(bot: Bot, trevor: Trevor) {
     logger.error("Cron: queue run failed (will retry on next schedule)", { error });
   }
 
-  await sendDailyReminders(bot, trevor).catch((error) => logger.error("Cron: reminders failed", { error }));
+  await sendDailyReminders(trevor).catch((error) => logger.error("Cron: reminders failed", { error }));
   logger.info("Cron: done");
 }
 

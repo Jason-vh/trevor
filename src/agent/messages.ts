@@ -26,3 +26,7 @@ export function formatChatMessage(message: ChatMessage): string {
 export function formatNotice(text: string): string {
   return `[notice]\n${text}`;
 }
+
+export function formatTask(text: string): string {
+  return `[scheduled task]\n${text}`;
+}

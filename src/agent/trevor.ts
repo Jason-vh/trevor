@@ -17,7 +17,7 @@ import type { Bot } from "grammy";
 
 import { ChatDoc, ChatsDoc, getChatId } from "@/agent/chats";
 import { keepRecentMessages } from "@/agent/context-window";
-import { type ChatMessage, formatChatMessage, formatNotice } from "@/agent/messages";
+import { type ChatMessage, formatChatMessage, formatNotice, formatTask } from "@/agent/messages";
 import { openConversationStorage } from "@/agent/storage";
 import { GROUP_CHAT, PRIVATE_CHAT, SYSTEM_PROMPT } from "@/agent/system-prompt";
 import { createTools } from "@/agent/tools";
@@ -37,6 +37,11 @@ export interface Trevor {
   receive(message: ChatMessage): Promise<Submission>;
   /** Tells Trevor about something that happened outside the chat, without asking him to act on it. */
   notice(chatId: string, text: string): Promise<void>;
+  /**
+   * Asks Trevor to do something in a chat on the app's behalf, such as the morning reminder.
+   * `requestId` makes it happen once, however often it is asked.
+   */
+  assign(chatId: string, task: string, requestId: string): Promise<Submission>;
   close(): Promise<void>;
 }
 
@@ -159,6 +164,11 @@ export async function startTrevor(bot: Bot, storagePath: string): Promise<Trevor
         },
         context,
       );
+    },
+
+    async assign(chatId, task, requestId) {
+      const conversation = await conversationFor(chatId);
+      return conversation.submit({ type: "input", content: formatTask(task), requestId }, context);
     },
 
     close: () => harness.close(context),

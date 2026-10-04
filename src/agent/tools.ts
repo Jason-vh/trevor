@@ -4,6 +4,7 @@ import type { Bot } from "grammy";
 
 import { getChatId } from "@/agent/chats";
 import { bookSlot } from "@/modules/booking";
+import { recordBookingOrigin } from "@/modules/booking-origins";
 import { cancelReservation } from "@/modules/cancel";
 import { createConfirmedEvent, createTentativeEvent, deleteEvent } from "@/modules/calendar";
 import { getCourtTiers, listCourtPreferences, setCourtTier } from "@/modules/court-preferences";
@@ -93,7 +94,7 @@ const bookCourt = defineTool({
     court_id: Type.Number({ description: "Court ID number (from check_availability results)" }),
     confirmed: confirmedParameter,
   }),
-  execute: async (args) => {
+  execute: async (args, api, context) => {
     if (needsConfirmation(args.date, args.time, args.confirmed)) {
       return text(
         "Not booked: this court starts within 6 hours, so it can't be cancelled for free. Ask the chat to confirm this court and time, and call book_court again with confirmed: true only after someone clearly says yes.",
@@ -120,6 +121,7 @@ const bookCourt = defineTool({
     }
 
     logger.info("Tool: book_court succeeded", { ...args, courtName: slot.courtName });
+    await recordBookingOrigin(await getChatId(api, api.conversationId, context), slot);
     await createConfirmedEvent(slot.courtName, slot.dateISO, slot.formattedStartTime).catch((error) =>
       logger.warn("Tool: book_court calendar event failed", { error }),
     );

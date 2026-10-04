@@ -2,6 +2,7 @@ import type { Bot } from "grammy";
 
 import type { Trevor } from "@/agent/trevor";
 import { bookSlot } from "@/modules/booking";
+import { recordBookingOrigin } from "@/modules/booking-origins";
 import { confirmEvent, createConfirmedEvent } from "@/modules/calendar";
 import { getCourtTiers } from "@/modules/court-preferences";
 import { expirePastEntries, getProcessableEntries, resetStaleProcessingEntries, setQueueStatus } from "@/modules/queue";
@@ -95,6 +96,7 @@ export async function processQueue(bot: Bot, trevor: Trevor): Promise<void> {
         });
         booked++;
         // The court is booked: nothing after this may put the entry back in the queue.
+        await recordBookingOrigin(entry.chatId, result.slot);
         await announceBooking(bot, trevor, entry, result.slot);
       } else {
         await setQueueStatus(entry.id, "pending");

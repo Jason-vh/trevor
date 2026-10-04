@@ -14,7 +14,7 @@ Trevor books squash courts at [SquashCity](https://squashcity.baanreserveren.nl/
 - 📋 **Queues requests** when nothing is free, and books the first matching court that opens up (checked every 5 minutes).
 - 📅 **Shows and cancels reservations**, and keeps a Google Calendar in sync.
 - 🏆 **Keeps match scores**.
-- ⏰ **Reminds the group** in the morning when there's squash that day.
+- ⏰ **Reminds the chat** in the morning when there's squash that day, in the chat that booked the court.
 
 ## How It Works
 
@@ -25,7 +25,7 @@ Telegram → grammY → pi-durable conversation (one per chat) → Claude + tool
 1. Every message in an allowed chat is stored in that chat's durable conversation, with who sent it and when.
 2. Trevor (Claude Sonnet 5.5) reads it and decides whether it asks something of him. If it does, he uses his tools and answers with `send_message`, the only way he can speak. Otherwise he stays quiet.
 3. Conversations, model turns and tool calls are committed to SQLite as they happen ([pi-durable](https://github.com/earendil-works/pi)), so a restart mid-turn picks up where it stopped.
-4. Every 5 minutes, an in-process cron job works through the booking queue and sends the morning reminder. Both are written into the conversation as notices, so Trevor knows about them.
+4. Every 5 minutes, an in-process cron job works through the booking queue, and from 09:00 asks Trevor to remind each chat of the courts it booked for today. Queue bookings are written into the conversation as notices, so Trevor knows about them.
 
 SquashCity has no API: Trevor logs in like a browser and scrapes the reservation pages.
 

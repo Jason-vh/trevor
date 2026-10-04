@@ -14,6 +14,11 @@ export function normalizeCourtName(court: string): string | null {
   return `Baan ${parseInt(number)}`;
 }
 
+/** Identifies a court booking within a day. */
+export function slotKey(time: string, court: string): string {
+  return `${time} ${court}`;
+}
+
 export function getTier(tiers: Map<string, CourtTier>, courtName: string): CourtTier {
   return tiers.get(courtName) ?? "neutral";
 }

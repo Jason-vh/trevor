@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 const timestamp = (name: string) =>
   integer(name, { mode: "timestamp_ms" })
@@ -38,3 +38,16 @@ export const courtPreferences = sqliteTable("court_preferences", {
   tier: text("tier").notNull(),
   updatedAt: timestamp("updated_at"),
 });
+
+/** Which chat asked for each court Trevor booked, so reminders go back to that chat. */
+export const bookingOrigins = sqliteTable(
+  "booking_origins",
+  {
+    date: text("date").notNull(),
+    time: text("time").notNull(),
+    court: text("court").notNull(),
+    chatId: text("chat_id").notNull(),
+    createdAt: timestamp("created_at"),
+  },
+  (table) => [primaryKey({ columns: [table.date, table.time, table.court] })],
+);
