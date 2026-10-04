@@ -4,16 +4,43 @@
   <img src="trevor.png" alt="Trevor the Squash Bot" width="200">
 </div>
 
-Trevor is a conversational AI chatbot for booking squash courts at [SquashCity](https://squashcity.baanreserveren.nl/). Send him a message like "book me a court next Tuesday at 18:30" and he'll check availability, confirm, and book. If nothing is available, he queues the request and retries every 5 minutes.
+Trevor books squash courts at [SquashCity](https://squashcity.baanreserveren.nl/) from a Telegram group chat. He reads along, and when someone asks him for something ("Trevor, book Tuesday 18:30"), he does it: checks what's free, books the best court, or queues the request and keeps retrying until a court opens up.
 
 ## What Trevor Does
 
-- 💬 **Conversational booking** - Chat naturally in Dutch or English via Telegram
-- 🔍 **Check availability** - Ask what courts are free for any date/time
-- 🤖 **Auto-booking** - Confirms before booking, handles the full 3-step flow
-- 📋 **Booking queue** - Watches for slots and books automatically when one opens up
-- 📅 **View reservations** - Shows your upcoming bookings
-- 🧠 **Conversation memory** - Remembers context across messages (persisted in Postgres)
+- 💬 **Reads the group chat** — no @ needed. He acts on direct requests and stays quiet while people talk among themselves.
+- 🔍 **Checks availability** for any date and time.
+- 🤖 **Books courts** straight away, picking preferred courts when several are free at the same time. Courts starting within 6 hours need a clear yes first, since they can't be cancelled for free.
+- 📋 **Queues requests** when nothing is free, and books the first matching court that opens up (checked every 5 minutes).
+- 📅 **Shows and cancels reservations**, and keeps a Google Calendar in sync.
+- 🏆 **Keeps match scores**.
+- ⏰ **Reminds the group** in the morning when there's squash that day.
+
+## How It Works
+
+```
+Telegram → grammY → pi-durable conversation (one per chat) → Claude + tools → send_message → Telegram
+```
+
+1. Every message in an allowed chat is stored in that chat's durable conversation, with who sent it and when.
+2. Trevor (Claude Sonnet 5.5) reads it and decides whether it asks something of him. If it does, he uses his tools and answers with `send_message`, the only way he can speak. Otherwise he stays quiet.
+3. Conversations, model turns and tool calls are committed to SQLite as they happen ([pi-durable](https://github.com/earendil-works/pi)), so a restart mid-turn picks up where it stopped.
+4. Every 5 minutes, an in-process cron job works through the booking queue and sends the morning reminder. Both are written into the conversation as notices, so Trevor knows about them.
+
+SquashCity has no API: Trevor logs in like a browser and scrapes the reservation pages.
+
+### Tools
+
+| Tool | What it does |
+|------|-------------|
+| `check_availability` | Free courts for a date and time range |
+| `book_court` | Books a court (needs `confirmed` within 6 hours of the start) |
+| `list_my_reservations` | Upcoming bookings |
+| `cancel_reservation` | Cancels a booking |
+| `add_to_queue` / `list_queue` / `remove_from_queue` | The booking queue |
+| `record_score` / `list_scores` | Match scores |
+| `set_court_preference` / `list_court_preferences` | Preferred and avoided courts |
+| `send_message` | Says something in the chat |
 
 ## Quick Start
 
@@ -30,93 +57,50 @@ Trevor is a conversational AI chatbot for booking squash courts at [SquashCity](
    # Edit .env.local with your credentials
    ```
 
-3. **Set up database**
-
-   ```bash
-   # Create a local Postgres database
-   createdb trevor
-
-   # Run migrations
-   bun run db:migrate
-   ```
-
-4. **Start the bot**
+3. **Start the bot**
 
    ```bash
    bun start
    ```
 
-   Trevor starts in long-polling mode locally (no public URL needed).
+   Trevor starts in long-polling mode locally (no public URL needed), and keeps his data in `./data`. Use a separate Telegram bot for development, with privacy mode off (BotFather → `/setprivacy` → Disable) so it receives group messages.
 
 ## Environment Variables
 
-Create a `.env.local` file:
+| Variable | |
+|---|---|
+| `SQUASH_CITY_USERNAME`, `SQUASH_CITY_PASSWORD` | SquashCity login |
+| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather |
+| `TELEGRAM_CHAT_ID` | Chats Trevor may talk in, comma-separated |
+| `ANTHROPIC_API_KEY` | Claude |
+| `DATA_DIR` | Where the SQLite files go (default `data`) |
+| `CALENDAR_WEBHOOK_URL` | Google Apps Script calendar sync (optional) |
+| `WEBHOOK_DOMAIN`, `WEBHOOK_SECRET` | Webhook mode, production only |
+
+## Development
 
 ```bash
-# Required: SquashCity login
-SQUASH_CITY_USERNAME=your_username
-SQUASH_CITY_PASSWORD=your_password
-
-# Required: Telegram bot (get from @BotFather)
-# Use separate bot tokens for dev vs prod
-TELEGRAM_BOT_TOKEN=your_bot_token
-TELEGRAM_CHAT_ID=your_chat_id          # comma-separated for multiple chats
-
-# Required: Claude API key
-ANTHROPIC_API_KEY=sk-ant-your_key_here
-
-# Required: Postgres connection
-DATABASE_URL=postgresql://user:password@localhost:5432/trevor
-
-# Production only (omit for local dev to use polling):
-# WEBHOOK_DOMAIN=your-app.up.railway.app
-# WEBHOOK_SECRET=random_secret_string
+bun run dev          # restart on changes
+bun test
+bun run lint
+bun run fmt
+bun run db:generate  # after changing src/db/schema.ts
 ```
 
-## How It Works
-
-```
-User message → Telegram → Grammy bot → pi-agent-core Agent → tool calls → response
-```
-
-1. User sends a message (DM or @mention in a group)
-2. Conversation history is loaded from Postgres
-3. A Claude-powered agent processes the message with access to 7 tools
-4. Tools call existing scraping/booking modules to interact with SquashCity
-5. The agent's response is sent back to Telegram
-6. A Railway cron job processes the booking queue every 5 minutes (`bun run cron`)
-
-### Agent Tools
-
-| Tool | What it does |
-|------|-------------|
-| `get_today_date` | Resolves "next Tuesday" → 2025-03-04 |
-| `check_availability` | Shows free courts for a date/time |
-| `book_court` | Books a specific court (3-step flow) |
-| `list_my_reservations` | Shows upcoming bookings |
-| `add_to_queue` | Queues a request for auto-retry |
-| `list_queue` | Shows pending queue entries |
-| `remove_from_queue` | Cancels a queued request |
+Migrations run when Trevor starts.
 
 ## Tech Stack
 
-- **[Bun](https://bun.sh)** - TypeScript runtime
-- **[Grammy](https://grammy.dev)** - Telegram bot framework
-- **[pi-agent-core](https://github.com/nicholasgasior/pi-agent-core)** - Agent orchestration
-- **[pi-ai](https://github.com/nicholasgasior/pi-ai)** - LLM communication (Anthropic/Claude)
-- **[Drizzle ORM](https://orm.drizzle.team)** - Type-safe Postgres ORM
-- **[Cheerio](https://cheerio.js.org)** - Server-side HTML parsing
+- **[Bun](https://bun.sh)** — runtime, HTTP server and SQLite
+- **[grammY](https://grammy.dev)** — Telegram
+- **[pi-durable](https://github.com/earendil-works/pi)** and **pi-ai** — durable agent conversations and Claude
+- **[Drizzle ORM](https://orm.drizzle.team)** — queue, scores and preferences in SQLite
+- **[Cheerio](https://cheerio.js.org)** — parsing SquashCity's pages
+- **[croner](https://github.com/Hexagon/croner)** — the queue schedule
 
 ## Deployment
 
-### Railway (recommended)
-
-Two Railway services from the same repo:
-
-- **Web service** — long-running webhook server for Telegram. Start command: `bunx drizzle-kit migrate && bun run src/index.ts`. Restart policy: ON_FAILURE.
-- **Cron service** — processes the booking queue. Start command: `bun run src/cron.ts`. Schedule: `*/5 * * * *`. Restart policy: NEVER.
-
-Pushes to `main` auto-deploy via GitHub Actions. Set `WEBHOOK_DOMAIN` to your Railway public domain to enable webhook mode on the web service.
+Trevor runs on an exe.dev VM at https://trevor.vhtm.eu, deployed by GitHub Actions on every push to `main`. See [deploy/README.md](deploy/README.md).
 
 ## License
 

@@ -2,6 +2,6 @@ pre-commit:
   parallel: true
   commands:
     fmt-check:
-      run: bunx oxfmt --check src
+      run: bunx oxfmt --check src scripts
     lint:
-      run: bunx oxlint src
+      run: bunx oxlint src scripts
