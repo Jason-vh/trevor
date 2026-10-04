@@ -37,6 +37,13 @@ ssh exe.dev domain add vhtm-eu trevor.vhtm.eu
 #   trevor.vhtm.eu  CNAME  vhtm-eu.exe.xyz
 ```
 
+## Telegram setup
+
+Trevor reads every message in the group chats he is in, so the bot needs
+privacy mode off: BotFather → `/setprivacy` → the bot → **Disable**.
+Telegram only applies that to groups the bot joins afterwards, so remove
+the bot from each group and add it back.
+
 ## GitHub Actions secrets
 
 | Secret | Purpose |

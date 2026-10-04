@@ -13,10 +13,10 @@ import {
 } from "@earendil-works/pi-durable";
 import type { Bot } from "grammy";
 
-import { ChatDoc, ChatsDoc } from "@/agent/chats";
+import { ChatDoc, ChatsDoc, getChatId } from "@/agent/chats";
 import { type ChatMessage, formatChatMessage, formatNotice } from "@/agent/messages";
 import { openConversationStorage } from "@/agent/storage";
-import { SYSTEM_PROMPT } from "@/agent/system-prompt";
+import { GROUP_CHAT, PRIVATE_CHAT, SYSTEM_PROMPT } from "@/agent/system-prompt";
 import { createTools } from "@/agent/tools";
 import { logger } from "@/utils/logger";
 
@@ -51,7 +51,14 @@ export async function startTrevor(bot: Bot, storagePath: string): Promise<Trevor
     defineExtension({
       name: "trevor",
       tools: createTools(bot),
-      sections: [section("trevor", () => SYSTEM_PROMPT, { tag: false })],
+      sections: [
+        section("trevor", () => SYSTEM_PROMPT, { tag: false }),
+        section("chat", async (input, renderContext) => {
+          const chatId = await getChatId(input.read, input.conversationId, renderContext);
+          // Telegram gives groups negative IDs.
+          return chatId.startsWith("-") ? GROUP_CHAT : PRIVATE_CHAT;
+        }),
+      ],
     }),
   );
 

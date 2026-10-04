@@ -13,10 +13,25 @@ import { listScores, recordScore } from "@/modules/scores";
 import { getSession } from "@/modules/session-manager";
 import { filterByTimeRange, getAllSlotsOnDate } from "@/modules/slots";
 import { getTier, normalizeCourtName, sortSlotsByPreference } from "@/utils/courts";
-import { getCurrentDateISO } from "@/utils/datetime";
+import { getCurrentDateISO, getMinutesUntil } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
 
 const TYPING_REFRESH_MS = 4_000;
+
+// A court can't be cancelled for free close to its start time, so booking one that starts this
+// soon needs a clear yes from the chat first.
+const CONFIRMATION_WINDOW_MINUTES = 6 * 60;
+
+const confirmedParameter = Type.Optional(
+  Type.Boolean({
+    description:
+      "true only once someone in the chat clearly said yes to this exact date and time. Required within 6 hours of the start.",
+  }),
+);
+
+function needsConfirmation(date: string, time: string, confirmed: boolean | undefined): boolean {
+  return !confirmed && getMinutesUntil(date, time) < CONFIRMATION_WINDOW_MINUTES;
+}
 
 function text(content: string): ToolExecutionResult {
   return { content: [{ type: "text", text: content }] };
@@ -76,8 +91,15 @@ const bookCourt = defineTool({
     date: Type.String({ description: "Date in YYYY-MM-DD format" }),
     time: Type.String({ description: "Time in HH:MM format" }),
     court_id: Type.Number({ description: "Court ID number (from check_availability results)" }),
+    confirmed: confirmedParameter,
   }),
   execute: async (args) => {
+    if (needsConfirmation(args.date, args.time, args.confirmed)) {
+      return text(
+        "Not booked: this court starts within 6 hours, so it can't be cancelled for free. Ask the chat to confirm this court and time, and call book_court again with confirmed: true only after someone clearly says yes.",
+      );
+    }
+
     const session = await getSession();
     const allSlots = await getAllSlotsOnDate(session, new Date(args.date + "T12:00:00"));
     const slot = allSlots.find(
@@ -152,11 +174,18 @@ const addToQueueTool = defineTool({
     date: Type.String({ description: "Target date in YYYY-MM-DD format" }),
     time_from: Type.String({ description: "Start of time range HH:MM" }),
     time_to: Type.String({ description: "End of time range HH:MM" }),
+    confirmed: confirmedParameter,
   }),
   execute: async (args, api, context) => {
     const today = getCurrentDateISO();
     if (args.date < today) {
       return text(`Date ${args.date} is in the past. Today is ${today}. Please use a future date.`);
+    }
+
+    if (needsConfirmation(args.date, args.time_from, args.confirmed)) {
+      return text(
+        "Not queued: this time starts within 6 hours, so the queue could book a court that can't be cancelled for free. Ask the chat to confirm, and call add_to_queue again with confirmed: true only after someone clearly says yes.",
+      );
     }
 
     const chatId = await getChatId(api, api.conversationId, context);

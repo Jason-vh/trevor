@@ -36,3 +36,14 @@ export function formatMessageTime(date: Date, timeZone: string = APP_TIME_ZONE):
   });
   return `${day.replace(",", "")} ${getCurrentTime(timeZone, date)}`;
 }
+
+/** Minutes from `now` until `time` on `dateISO`, both in `timeZone`. Negative once it has started. */
+export function getMinutesUntil(
+  dateISO: string,
+  time: string,
+  now: Date = new Date(),
+  timeZone: string = APP_TIME_ZONE,
+): number {
+  const days = (Date.parse(dateISO) - Date.parse(getCurrentDateISO(timeZone, now))) / 86_400_000;
+  return days * 24 * 60 + getTimeInMinutes(time) - getTimeInMinutes(getCurrentTime(timeZone, now));
+}
