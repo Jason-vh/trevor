@@ -2,6 +2,7 @@ import { Bot } from "grammy";
 import type { Update } from "@grammyjs/types";
 
 import { startTrevor } from "@/agent/trevor";
+import { closeDatabase, migrateDatabase } from "@/db";
 import { getMetadata } from "@/modules/metadata";
 import { listRecentQueue } from "@/modules/queue";
 import { getUpcomingReservations } from "@/modules/reservations";
@@ -63,6 +64,7 @@ async function handleRequest(req: Request): Promise<Response> {
 }
 
 async function main() {
+  migrateDatabase();
   const trevor = await startTrevor(bot, config.conversationsPath);
   handleMessages(bot, trevor);
 
@@ -93,6 +95,7 @@ async function main() {
     await server.stop();
     if (!config.webhook) await bot.stop();
     await trevor.close();
+    closeDatabase();
     process.exit(0);
   };
 

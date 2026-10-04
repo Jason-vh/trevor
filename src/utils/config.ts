@@ -14,7 +14,8 @@ export interface Config {
     apiKey: string;
   };
 
-  databaseUrl: string;
+  /** SQLite file holding the queue, scores, court preferences and metadata. */
+  databasePath: string;
 
   /** SQLite file holding Trevor's conversations. */
   conversationsPath: string;
@@ -39,10 +40,7 @@ if (!Bun.env.ANTHROPIC_API_KEY) {
   throw new Error("Missing ANTHROPIC_API_KEY");
 }
 
-if (!Bun.env.DATABASE_URL) {
-  throw new Error("Missing DATABASE_URL");
-}
-
+const dataDir = Bun.env.DATA_DIR || "data";
 const chatIds = new Set(Bun.env.TELEGRAM_CHAT_ID.split(",").map((id) => id.trim()));
 const groupChatIds = new Set([...chatIds].filter((id) => id.startsWith("-")));
 
@@ -59,8 +57,8 @@ export const config: Config = {
   anthropic: {
     apiKey: Bun.env.ANTHROPIC_API_KEY,
   },
-  databaseUrl: Bun.env.DATABASE_URL,
-  conversationsPath: `${Bun.env.DATA_DIR || "data"}/conversations.db`,
+  databasePath: `${dataDir}/trevor.db`,
+  conversationsPath: `${dataDir}/conversations.db`,
   calendarWebhookUrl: Bun.env.CALENDAR_WEBHOOK_URL,
   webhook: Bun.env.WEBHOOK_DOMAIN
     ? {

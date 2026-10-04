@@ -1,54 +1,12 @@
 {
   "version": "7",
-  "dialect": "postgresql",
+  "dialect": "sqlite",
   "entries": [
     {
       "idx": 0,
-      "version": "7",
-      "when": 1771946007768,
-      "tag": "0000_uneven_goblin_queen",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1772185732455,
-      "tag": "0001_eminent_wolf_cub",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1772187438731,
-      "tag": "0002_equal_namora",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1773158687275,
-      "tag": "0003_free_agent_brand",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1773777924553,
-      "tag": "0004_purple_tigra",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1789292706799,
-      "tag": "0005_ordinary_cobalt_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1791118656631,
-      "tag": "0006_purple_misty_knight",
+      "version": "6",
+      "when": 1791118933292,
+      "tag": "0000_init",
       "breakpoints": true
     }
   ]

@@ -26,7 +26,6 @@ jobs:
           cat > .env.production <<EOF
           NODE_ENV=${{ secrets.NODE_ENV }}
           TZ=${{ secrets.TZ }}
-          DATABASE_URL=postgresql://trevor:${{ secrets.TREVOR_DB_PASSWORD }}@postgres:5432/trevor
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}
           WEBHOOK_DOMAIN=trevor.vhtm.eu
@@ -51,11 +50,6 @@ jobs:
         run: |
           cd "$DEPLOY_DIR"
           docker compose --env-file .env.production build
-
-      - name: Apply Drizzle migrations
-        run: |
-          cd "$DEPLOY_DIR"
-          docker compose --env-file .env.production run --rm app bunx drizzle-kit migrate
 
       - name: Start app
         run: |
