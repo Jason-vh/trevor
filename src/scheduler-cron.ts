@@ -1,6 +1,7 @@
-import { Bot } from "grammy";
 import { Cron } from "croner";
+import type { Bot } from "grammy";
 
+import type { Trevor } from "@/agent/trevor";
 import { setMetadata } from "@/modules/metadata";
 import { sendDailyReminders } from "@/modules/reminders";
 import { processQueue } from "@/modules/scheduler";
@@ -9,11 +10,11 @@ import { logger } from "@/utils/logger";
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 5_000;
 
-async function runTick(bot: Bot) {
+async function runTick(bot: Bot, trevor: Trevor) {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      await processQueue(bot);
-      await sendDailyReminders(bot).catch((error) => logger.error("Cron: reminders failed", { error }));
+      await processQueue(bot, trevor);
+      await sendDailyReminders(bot, trevor).catch((error) => logger.error("Cron: reminders failed", { error }));
       await setMetadata("last_cron_run", new Date().toISOString()).catch((err) =>
         logger.warn("Cron: failed to record last run", { error: err }),
       );
@@ -44,8 +45,8 @@ async function runTick(bot: Bot) {
   }
 }
 
-export function startCron(bot: Bot) {
-  const job = new Cron("*/5 * * * *", { protect: true }, () => runTick(bot));
+export function startCron(bot: Bot, trevor: Trevor) {
+  const job = new Cron("*/5 * * * *", { protect: true }, () => runTick(bot, trevor));
   logger.info("Cron scheduled", { schedule: "*/5 * * * *", next: job.nextRun() });
   return job;
 }

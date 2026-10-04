@@ -16,6 +16,9 @@ export interface Config {
 
   databaseUrl: string;
 
+  /** SQLite file holding Trevor's conversations. */
+  conversationsPath: string;
+
   calendarWebhookUrl?: string;
 
   webhook?: {
@@ -57,7 +60,8 @@ export const config: Config = {
     apiKey: Bun.env.ANTHROPIC_API_KEY,
   },
   databaseUrl: Bun.env.DATABASE_URL,
-  calendarWebhookUrl: Bun.env["CALENDAR_WEBHOOK_URL"],
+  conversationsPath: `${Bun.env.DATA_DIR || "data"}/conversations.db`,
+  calendarWebhookUrl: Bun.env.CALENDAR_WEBHOOK_URL,
   webhook: Bun.env.WEBHOOK_DOMAIN
     ? {
         domain: Bun.env.WEBHOOK_DOMAIN,

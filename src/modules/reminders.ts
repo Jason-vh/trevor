@@ -1,5 +1,6 @@
 import type { Bot } from "grammy";
 
+import type { Trevor } from "@/agent/trevor";
 import { getMetadata, setMetadata } from "@/modules/metadata";
 import { getSession } from "@/modules/session-manager";
 import { getAllSlotsOnDate } from "@/modules/slots";
@@ -10,7 +11,7 @@ import { buildReminderMessage, shouldSendReminder } from "@/utils/reminders";
 
 const REMINDER_SENT_KEY = "reminders_sent_date";
 
-export async function sendDailyReminders(bot: Bot): Promise<void> {
+export async function sendDailyReminders(bot: Bot, trevor: Trevor): Promise<void> {
   const today = getCurrentDateISO();
   const lastSent = await getMetadata(REMINDER_SENT_KEY);
 
@@ -32,9 +33,12 @@ export async function sendDailyReminders(bot: Bot): Promise<void> {
   const message = buildReminderMessage(bookings);
 
   for (const chatId of config.telegram.groupChatIds) {
-    await bot.api
-      .sendMessage(chatId, message)
-      .catch((error) => logger.error("Reminders: failed to send", { chatId, error }));
+    try {
+      await bot.api.sendMessage(chatId, message);
+      await trevor.notice(chatId, `The morning reminder was sent to the chat:\n${message}`);
+    } catch (error) {
+      logger.error("Reminders: failed to send", { chatId, error });
+    }
   }
 
   logger.info("Reminders: sent", { date: today, bookingCount: bookings.length });

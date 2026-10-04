@@ -6,10 +6,17 @@ services:
       - .env.production
     environment:
       PORT: 3000
+      DATA_DIR: /app/data
+    volumes:
+      # A named volume, because the deploy replaces the checkout directory on every push.
+      - data:/app/data
     ports:
       - "127.0.0.1:${TREVOR_APP_HOST_PORT:-3007}:3000"
     networks:
       - apps-net
+
+volumes:
+  data:
 
 networks:
   apps-net:

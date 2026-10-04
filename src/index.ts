@@ -1,78 +1,16 @@
 import { Bot } from "grammy";
 import type { Update } from "@grammyjs/types";
 
-import { runAgent } from "@/agent/agent";
-import { db } from "@/db";
-import { messages } from "@/db/schema";
+import { startTrevor } from "@/agent/trevor";
 import { getMetadata } from "@/modules/metadata";
 import { listRecentQueue } from "@/modules/queue";
 import { getUpcomingReservations } from "@/modules/reservations";
 import { startCron } from "@/scheduler-cron";
+import { handleMessages } from "@/telegram";
 import { config } from "@/utils/config";
 import { logger } from "@/utils/logger";
-import { desc, eq } from "drizzle-orm";
 
 const bot = new Bot(config.telegram.token);
-
-// Only respond to allowed chats. In groups, only respond when mentioned.
-bot.on("message:text", async (ctx) => {
-  const chatId = String(ctx.chat.id);
-
-  if (!config.telegram.chatIds.has(chatId)) {
-    logger.warn("Ignoring message from unauthorized chat", { chatId: ctx.chat.id });
-    return;
-  }
-
-  const isGroup = ctx.chat.type === "group" || ctx.chat.type === "supergroup";
-  let messageText = ctx.message.text;
-
-  if (isGroup) {
-    // In groups, only respond when the bot is @mentioned
-    const botUsername = ctx.me.username;
-    const mention = `@${botUsername}`;
-
-    if (!messageText.includes(mention)) {
-      return;
-    }
-
-    // Strip the @mention from the message
-    messageText = messageText.replaceAll(mention, "").trim();
-
-    if (!messageText) {
-      await ctx.reply("Yes? What can I do for you?", { reply_parameters: { message_id: ctx.message.message_id } });
-      return;
-    }
-  }
-
-  logger.info("Received message", {
-    chatId,
-    textLength: messageText.length,
-    isGroup,
-  });
-
-  const elapsed = logger.time();
-
-  // Show a "typing…" indicator while Trevor works. The status auto-clears after
-  // ~5s (or when the reply lands), so refresh it until the agent is done.
-  await ctx.replyWithChatAction("typing").catch(() => {});
-  const typingInterval = setInterval(() => {
-    ctx.replyWithChatAction("typing").catch(() => {});
-  }, 4000);
-
-  try {
-    const response = await runAgent(chatId, messageText);
-    const replyParams = isGroup ? { reply_parameters: { message_id: ctx.message.message_id } } : {};
-    // Plain text only — no parse_mode, no rich messages. Trevor formats with
-    // line breaks, bullets and emoji (see the system prompt).
-    await ctx.reply(response, replyParams);
-    logger.info("Message handled", { chatId, isGroup, latencyMs: elapsed() });
-  } catch (error) {
-    logger.error("Error processing message", { chatId, isGroup, latencyMs: elapsed(), error });
-    await ctx.reply("Sorry, something went wrong. Please try again.");
-  } finally {
-    clearInterval(typingInterval);
-  }
-});
 
 const dashboardPath = new URL("./dashboard/index.html", import.meta.url).pathname;
 
@@ -109,26 +47,15 @@ async function handleRequest(req: Request): Promise<Response> {
       if (req.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret) {
         return new Response("Unauthorized", { status: 401 });
       }
+      // Answer only once the message is stored, so Telegram retries anything we failed to take in.
       const update = (await req.json()) as Update;
-      bot.handleUpdate(update).catch((err) => logger.error("Error handling update", { error: err }));
-      return new Response("OK", { status: 200 });
-    }
-
-    if (url.pathname === "/history" && req.method === "GET") {
-      if (req.headers.get("Authorization") !== `Bearer ${secret}`) {
-        return new Response("Unauthorized", { status: 401 });
+      try {
+        await bot.handleUpdate(update);
+      } catch (error) {
+        logger.error("Error handling update", { error });
+        return new Response("Error", { status: 500 });
       }
-      const chatId = url.searchParams.get("chat_id");
-      if (!chatId) return new Response("Missing chat_id", { status: 400 });
-      const rows = await db
-        .select({ role: messages.role, content: messages.content, createdAt: messages.createdAt })
-        .from(messages)
-        .where(eq(messages.chatId, chatId))
-        .orderBy(desc(messages.createdAt))
-        .limit(20);
-      return new Response(JSON.stringify(rows.reverse()), {
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response("OK", { status: 200 });
     }
   }
 
@@ -136,6 +63,9 @@ async function handleRequest(req: Request): Promise<Response> {
 }
 
 async function main() {
+  const trevor = await startTrevor(bot, config.conversationsPath);
+  handleMessages(bot, trevor);
+
   const server = Bun.serve({
     port: Number(Bun.env.PORT) || 3000,
     fetch: handleRequest,
@@ -150,17 +80,19 @@ async function main() {
     logger.info(`Webhook set: https://${domain}/webhook`);
   } else {
     logger.info("Starting bot in long-polling mode");
+    bot.catch((error) => logger.error("Error handling update", { error: error.error }));
     bot.start();
   }
 
   logger.info(`Server listening on port ${server.port}`);
 
-  const cronJob = startCron(bot);
+  const cronJob = startCron(bot, trevor);
 
-  const shutdown = () => {
+  const shutdown = async () => {
     cronJob.stop();
-    server.stop();
-    if (!config.webhook) bot.stop();
+    await server.stop();
+    if (!config.webhook) await bot.stop();
+    await trevor.close();
     process.exit(0);
   };
 

@@ -1,0 +1,23 @@
+import { formatMessageTime } from "@/utils/datetime";
+
+export type ChatMessage = {
+  chatId: string;
+  messageId: number;
+  sender: string;
+  text: string;
+  sentAt: Date;
+  replyTo?: { messageId: number; sender: string };
+};
+
+/** How a Telegram message reads to Trevor: who sent it, when, and what it replies to. */
+export function formatChatMessage(message: ChatMessage): string {
+  const details = [`message ${message.messageId} from ${message.sender}`, formatMessageTime(message.sentAt)];
+  if (message.replyTo) {
+    details.push(`replying to message ${message.replyTo.messageId} from ${message.replyTo.sender}`);
+  }
+  return `[${details.join(", ")}]\n${message.text}`;
+}
+
+export function formatNotice(text: string): string {
+  return `[notice]\n${text}`;
+}

@@ -1,410 +1,340 @@
-import type { AgentTool } from "@mariozechner/pi-agent-core";
-import { Type } from "@mariozechner/pi-ai";
+import { Type, type TSchema } from "@earendil-works/pi-ai";
+import { defineTool, type ToolExecutionResult, type ToolRegistration } from "@earendil-works/pi-durable";
+import type { Bot } from "grammy";
 
+import { getChatId } from "@/agent/chats";
 import { bookSlot } from "@/modules/booking";
 import { cancelReservation } from "@/modules/cancel";
 import { createConfirmedEvent, createTentativeEvent, deleteEvent } from "@/modules/calendar";
 import { getCourtTiers, listCourtPreferences, setCourtTier } from "@/modules/court-preferences";
 import { addToQueue, listPendingQueue, removeFromQueue, setQueueCalendarEventId } from "@/modules/queue";
-import { recordScore, listScores } from "@/modules/scores";
 import { getUpcomingReservations } from "@/modules/reservations";
+import { listScores, recordScore } from "@/modules/scores";
 import { getSession } from "@/modules/session-manager";
-import { getAllSlotsOnDate, filterByTimeRange } from "@/modules/slots";
+import { filterByTimeRange, getAllSlotsOnDate } from "@/modules/slots";
 import { getTier, normalizeCourtName, sortSlotsByPreference } from "@/utils/courts";
 import { getCurrentDateISO } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
 
-function text(t: string) {
-  return { content: [{ type: "text" as const, text: t }], details: undefined };
+const TYPING_REFRESH_MS = 4_000;
+
+function text(content: string): ToolExecutionResult {
+  return { content: [{ type: "text", text: content }] };
 }
 
-const emptyParams = Type.Object({});
+function json(value: unknown): ToolExecutionResult {
+  return text(JSON.stringify(value, null, 2));
+}
 
-const checkAvailabilityParams = Type.Object({
-  date: Type.String({ description: "Date in YYYY-MM-DD format" }),
-  time_from: Type.Optional(Type.String({ description: "Start time HH:MM (e.g. 18:00)" })),
-  time_to: Type.Optional(Type.String({ description: "End time HH:MM (e.g. 19:00)" })),
-});
-
-const bookCourtParams = Type.Object({
-  date: Type.String({ description: "Date in YYYY-MM-DD format" }),
-  time: Type.String({ description: "Time in HH:MM format" }),
-  court_id: Type.Number({ description: "Court ID number (from check_availability results)" }),
-});
-
-const addToQueueParams = Type.Object({
-  date: Type.String({ description: "Target date in YYYY-MM-DD format" }),
-  time_from: Type.String({ description: "Start of time range HH:MM" }),
-  time_to: Type.String({ description: "End of time range HH:MM" }),
-});
-
-const removeFromQueueParams = Type.Object({
-  id: Type.Number({ description: "Queue entry ID to cancel" }),
-});
-
-const recordScoreParams = Type.Object({
-  date: Type.String({ description: "Date of the session in YYYY-MM-DD format", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }),
-  player1: Type.String({ description: "Name of first player" }),
-  player2: Type.String({ description: "Name of second player" }),
-  score1: Type.Number({ description: "Number of games won by player1" }),
-  score2: Type.Number({ description: "Number of games won by player2" }),
-});
-
-const listScoresParams = Type.Object({
-  limit: Type.Optional(Type.Number({ description: "Number of recent scores to show (default 10)" })),
-});
-
-const setCourtPreferenceParams = Type.Object({
-  court: Type.String({ description: 'Court name or number, e.g. "Baan 12" or "12"' }),
-  tier: Type.Union([Type.Literal("preferred"), Type.Literal("neutral"), Type.Literal("avoided")], {
-    description: "preferred = book first, avoided = book only as last resort, neutral = no preference",
-  }),
-});
-
-const cancelReservationParams = Type.Object({
-  reservation_id: Type.String({ description: "Reservation ID from list_my_reservations" }),
-  date: Type.String({ description: "Reservation date in YYYY-MM-DD (for calendar cleanup)" }),
-  time: Type.String({ description: "Reservation start time in HH:MM (for calendar cleanup)" }),
-});
-
-const checkAvailability: AgentTool<typeof checkAvailabilityParams> = {
+const checkAvailability = defineTool({
   name: "check_availability",
-  label: "Check Availability",
   description: "Check available squash courts for a specific date and optional time range.",
-  parameters: checkAvailabilityParams,
-  execute: async (_toolCallId, params) => {
-    const elapsed = logger.time();
-    logger.info("Tool: check_availability", { date: params.date, timeFrom: params.time_from, timeTo: params.time_to });
+  parameters: Type.Object({
+    date: Type.String({ description: "Date in YYYY-MM-DD format" }),
+    time_from: Type.Optional(Type.String({ description: "Start time HH:MM (e.g. 18:00)" })),
+    time_to: Type.Optional(Type.String({ description: "End time HH:MM (e.g. 19:00)" })),
+  }),
+  execute: async (args) => {
+    const session = await getSession();
+    const allSlots = await getAllSlotsOnDate(session, new Date(args.date + "T12:00:00"));
 
-    try {
-      const session = await getSession();
-      const dateObj = new Date(params.date + "T12:00:00");
-      const allSlots = await getAllSlotsOnDate(session, dateObj);
-
-      let slots = allSlots;
-      if (params.time_from && params.time_to) {
-        slots = filterByTimeRange(allSlots, params.time_from, params.time_to);
-      } else if (params.time_from) {
-        slots = filterByTimeRange(allSlots, params.time_from, params.time_from);
-      }
-
-      const courtTiers = await getCourtTiers();
-      const available = sortSlotsByPreference(
-        slots.filter((s) => s.isAvailable),
-        courtTiers,
-      );
-      const result = available.map((s) => ({
-        courtName: s.courtName,
-        courtId: s.courtId,
-        time: s.formattedStartTime,
-        date: s.formattedDate,
-        dateISO: s.dateISO,
-        offPeak: s.offPeak,
-        preference: getTier(courtTiers, s.courtName),
-      }));
-
-      logger.info("Tool: check_availability completed", {
-        date: params.date,
-        availableCount: result.length,
-        latencyMs: elapsed(),
-      });
-
-      if (result.length === 0) {
-        return text("No available courts found for the given date/time range.");
-      }
-
-      return text(JSON.stringify(result, null, 2));
-    } catch (error) {
-      logger.error("Tool: check_availability failed", { date: params.date, latencyMs: elapsed(), error });
-      throw error;
+    let slots = allSlots;
+    if (args.time_from) {
+      slots = filterByTimeRange(allSlots, args.time_from, args.time_to ?? args.time_from);
     }
-  },
-};
 
-const bookCourt: AgentTool<typeof bookCourtParams> = {
+    const courtTiers = await getCourtTiers();
+    const available = sortSlotsByPreference(
+      slots.filter((slot) => slot.isAvailable),
+      courtTiers,
+    );
+
+    logger.info("Tool: check_availability", { date: args.date, availableCount: available.length });
+
+    if (available.length === 0) {
+      return text("No available courts found for the given date/time range.");
+    }
+
+    return json(
+      available.map((slot) => ({
+        courtName: slot.courtName,
+        courtId: slot.courtId,
+        time: slot.formattedStartTime,
+        date: slot.formattedDate,
+        dateISO: slot.dateISO,
+        offPeak: slot.offPeak,
+        preference: getTier(courtTiers, slot.courtName),
+      })),
+    );
+  },
+});
+
+const bookCourt = defineTool({
   name: "book_court",
-  label: "Book Court",
   description: "Book a specific squash court. Requires the court ID, date, and time.",
-  parameters: bookCourtParams,
-  execute: async (_toolCallId, params) => {
-    const elapsed = logger.time();
-    logger.info("Tool: book_court", { date: params.date, time: params.time, courtId: params.court_id });
+  parameters: Type.Object({
+    date: Type.String({ description: "Date in YYYY-MM-DD format" }),
+    time: Type.String({ description: "Time in HH:MM format" }),
+    court_id: Type.Number({ description: "Court ID number (from check_availability results)" }),
+  }),
+  execute: async (args) => {
+    const session = await getSession();
+    const allSlots = await getAllSlotsOnDate(session, new Date(args.date + "T12:00:00"));
+    const slot = allSlots.find(
+      (candidate) =>
+        candidate.courtId === args.court_id && candidate.formattedStartTime === args.time && candidate.isAvailable,
+    );
 
-    try {
-      const session = await getSession();
-      const dateObj = new Date(params.date + "T12:00:00");
-      const allSlots = await getAllSlotsOnDate(session, dateObj);
+    if (!slot) {
+      logger.warn("Tool: book_court slot not found or unavailable", { ...args });
+      return text("Could not find the requested court/time slot, or it's no longer available.");
+    }
 
-      const targetSlot = allSlots.find(
-        (s) => s.courtId === params.court_id && s.formattedStartTime === params.time && s.isAvailable,
-      );
+    const result = await bookSlot(slot, session);
 
-      if (!targetSlot) {
-        logger.warn("Tool: book_court slot not found or unavailable", {
-          date: params.date,
-          time: params.time,
-          courtId: params.court_id,
-          latencyMs: elapsed(),
-        });
-        return text("Could not find the requested court/time slot, or it's no longer available.");
-      }
-
-      const result = await bookSlot(targetSlot, session);
-
-      if (result.success) {
-        logger.info("Tool: book_court succeeded", {
-          date: params.date,
-          time: params.time,
-          courtId: params.court_id,
-          courtName: targetSlot.courtName,
-          reservationId: result.reservationId,
-          latencyMs: elapsed(),
-        });
-        await createConfirmedEvent(targetSlot.courtName, targetSlot.dateISO, targetSlot.formattedStartTime).catch(
-          (err) => logger.warn("Tool: book_court calendar event failed", { error: err }),
-        );
-        return text(
-          `Successfully booked ${targetSlot.courtName} on ${targetSlot.formattedDate} at ${targetSlot.formattedStartTime}. Reservation ID: ${result.reservationId || "N/A"}`,
-        );
-      }
-
-      logger.warn("Tool: book_court failed", {
-        date: params.date,
-        time: params.time,
-        courtId: params.court_id,
-        courtName: targetSlot.courtName,
-        error: result.error,
-        latencyMs: elapsed(),
-      });
+    if (!result.success) {
+      logger.warn("Tool: book_court failed", { ...args, error: result.error });
       return text(`Booking failed: ${result.error}`);
-    } catch (error) {
-      logger.error("Tool: book_court threw", {
-        date: params.date,
-        time: params.time,
-        courtId: params.court_id,
-        latencyMs: elapsed(),
-        error,
-      });
-      throw error;
     }
-  },
-};
 
-const listMyReservations: AgentTool<typeof emptyParams> = {
+    logger.info("Tool: book_court succeeded", { ...args, courtName: slot.courtName });
+    await createConfirmedEvent(slot.courtName, slot.dateISO, slot.formattedStartTime).catch((error) =>
+      logger.warn("Tool: book_court calendar event failed", { error }),
+    );
+
+    return text(`Successfully booked ${slot.courtName} on ${slot.formattedDate} at ${slot.formattedStartTime}.`);
+  },
+});
+
+const listMyReservations = defineTool({
   name: "list_my_reservations",
-  label: "List My Reservations",
-  description: "Show the user's upcoming squash court reservations for the next 8 days.",
-  parameters: emptyParams,
+  description: "Show our upcoming squash court reservations for the next 8 days.",
+  parameters: Type.Object({}),
   execute: async () => {
-    const result = await getUpcomingReservations();
+    const reservations = await getUpcomingReservations();
+    if (reservations.length === 0) return text("No upcoming reservations found.");
+    return json(reservations);
+  },
+});
 
-    if (result.length === 0) {
-      return text("No upcoming reservations found.");
+const cancelReservationTool = defineTool({
+  name: "cancel_reservation",
+  description:
+    "Cancel one of our existing court reservations. Get the reservation_id from list_my_reservations first, and confirm with the chat before calling this.",
+  parameters: Type.Object({
+    reservation_id: Type.String({ description: "Reservation ID from list_my_reservations" }),
+    date: Type.String({ description: "Reservation date in YYYY-MM-DD (for calendar cleanup)" }),
+    time: Type.String({ description: "Reservation start time in HH:MM (for calendar cleanup)" }),
+  }),
+  execute: async (args) => {
+    const session = await getSession();
+    const result = await cancelReservation(args.reservation_id, session);
+
+    if (!result.success) {
+      logger.warn("Tool: cancel_reservation failed", { reservationId: args.reservation_id, error: result.error });
+      return text(`Could not cancel the reservation: ${result.error}`);
     }
 
-    return text(JSON.stringify(result, null, 2));
-  },
-};
+    logger.info("Tool: cancel_reservation succeeded", { reservationId: args.reservation_id });
+    await deleteEvent(args.date, args.time).catch((error) =>
+      logger.warn("Tool: cancel_reservation calendar delete failed", { error }),
+    );
 
-function makeAddToQueueTool(chatId: string): AgentTool<typeof addToQueueParams> {
-  return {
-    name: "add_to_queue",
-    label: "Add to Queue",
-    description:
-      "Add a booking request to the queue for automatic retry every 5 minutes. Use this when no courts are currently available.",
-    parameters: addToQueueParams,
-    execute: async (_toolCallId, params) => {
-      const today = getCurrentDateISO();
-      if (params.date < today) {
-        return text(`Date ${params.date} is in the past. Today is ${today}. Please use a future date.`);
-      }
-      logger.info("Tool: add_to_queue", { date: params.date, timeFrom: params.time_from, timeTo: params.time_to });
-      const entry = await addToQueue(chatId, params.date, params.time_from, params.time_to);
-      logger.info("Tool: add_to_queue entry created", {
+    return text(`Cancelled the reservation on ${args.date} at ${args.time}.`);
+  },
+});
+
+const addToQueueTool = defineTool({
+  name: "add_to_queue",
+  description:
+    "Add a booking request to the queue for automatic retry every 5 minutes. Use this when no courts are currently available.",
+  parameters: Type.Object({
+    date: Type.String({ description: "Target date in YYYY-MM-DD format" }),
+    time_from: Type.String({ description: "Start of time range HH:MM" }),
+    time_to: Type.String({ description: "End of time range HH:MM" }),
+  }),
+  execute: async (args, api, context) => {
+    const today = getCurrentDateISO();
+    if (args.date < today) {
+      return text(`Date ${args.date} is in the past. Today is ${today}. Please use a future date.`);
+    }
+
+    const chatId = await getChatId(api, api.conversationId, context);
+    const entry = await addToQueue(chatId, args.date, args.time_from, args.time_to);
+    logger.info("Tool: add_to_queue", { id: entry.id, ...args });
+
+    const eventId = await createTentativeEvent(args.date, args.time_from, args.time_to);
+    if (eventId) await setQueueCalendarEventId(entry.id, eventId);
+
+    return text(
+      `Added to queue (ID: ${entry.id}). It is retried every 5 minutes and books the first court that opens up.`,
+    );
+  },
+});
+
+const listQueue = defineTool({
+  name: "list_queue",
+  description: "Show all pending booking requests in the queue.",
+  parameters: Type.Object({}),
+  execute: async () => {
+    const entries = await listPendingQueue();
+    if (entries.length === 0) return text("No pending requests in the queue.");
+    return json(
+      entries.map((entry) => ({
         id: entry.id,
-        date: params.date,
-        timeFrom: params.time_from,
-        timeTo: params.time_to,
-      });
-      const eventId = await createTentativeEvent(params.date, params.time_from, params.time_to);
-      if (eventId) await setQueueCalendarEventId(entry.id, eventId);
-      return text(
-        `Added to queue (ID: ${entry.id}). I'll check every 5 minutes and book when a court becomes available.`,
-      );
+        date: entry.date,
+        timeFrom: entry.timeFrom,
+        timeTo: entry.timeTo,
+        createdAt: entry.createdAt,
+      })),
+    );
+  },
+});
+
+const removeFromQueueTool = defineTool({
+  name: "remove_from_queue",
+  description: "Cancel a pending booking request from the queue.",
+  parameters: Type.Object({
+    id: Type.Number({ description: "Queue entry ID to cancel" }),
+  }),
+  execute: async (args) => {
+    await removeFromQueue(args.id);
+    logger.info("Tool: remove_from_queue", { id: args.id });
+    return text(`Removed queue entry ${args.id}.`);
+  },
+});
+
+const recordScoreTool = defineTool({
+  name: "record_score",
+  description: "Record the score of a squash session between two players (e.g. Jason 3 - 1 Amp).",
+  parameters: Type.Object({
+    date: Type.String({ description: "Date of the session in YYYY-MM-DD format", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }),
+    player1: Type.String({ description: "Name of first player" }),
+    player2: Type.String({ description: "Name of second player" }),
+    score1: Type.Number({ description: "Number of games won by player1" }),
+    score2: Type.Number({ description: "Number of games won by player2" }),
+  }),
+  execute: async (args) => {
+    const entry = await recordScore(args.date, args.player1, args.player2, args.score1, args.score2);
+    logger.info("Tool: record_score", { id: entry.id });
+    return text(`Score recorded: ${entry.player1} ${entry.score1} - ${entry.score2} ${entry.player2} on ${entry.date}`);
+  },
+});
+
+const listScoresTool = defineTool({
+  name: "list_scores",
+  description: "Show recent squash session scores.",
+  parameters: Type.Object({
+    limit: Type.Optional(Type.Number({ description: "Number of recent scores to show (default 10)" })),
+  }),
+  execute: async (args) => {
+    const entries = await listScores(args.limit);
+    if (entries.length === 0) return text("No scores recorded yet.");
+    return json(entries);
+  },
+});
+
+const listCourtPreferencesTool = defineTool({
+  name: "list_court_preferences",
+  description: "Show which courts are preferred and which are avoided when booking.",
+  parameters: Type.Object({}),
+  execute: async () => {
+    const preferences = await listCourtPreferences();
+    if (preferences.length === 0) return text("No court preferences set — all courts are treated equally.");
+    return json(preferences);
+  },
+});
+
+const setCourtPreferenceTool = defineTool({
+  name: "set_court_preference",
+  description:
+    "Set how much a court is favoured when several are free at the same time. Use when someone says they like or dislike a court.",
+  parameters: Type.Object({
+    court: Type.String({ description: 'Court name or number, e.g. "Baan 12" or "12"' }),
+    tier: Type.Union([Type.Literal("preferred"), Type.Literal("neutral"), Type.Literal("avoided")], {
+      description: "preferred = book first, avoided = book only as last resort, neutral = no preference",
+    }),
+  }),
+  execute: async (args) => {
+    const court = normalizeCourtName(args.court);
+    if (!court) {
+      return text(`"${args.court}" is not a court name. Courts are named Baan 1 through Baan 13.`);
+    }
+
+    await setCourtTier(court, args.tier);
+    logger.info("Tool: set_court_preference", { court, tier: args.tier });
+    return text(`${court} is now ${args.tier}.`);
+  },
+});
+
+function createSendMessageTool(bot: Bot) {
+  return defineTool({
+    name: "send_message",
+    description:
+      "Send a message to the chat. This is the only way anyone sees what you say, and it ends your turn, so call it last, on its own.",
+    parameters: Type.Object({
+      text: Type.String({ description: "The message, in plain text" }),
+      reply_to: Type.Optional(
+        Type.Number({ description: "Message number to reply to, when it helps to make clear what you answer" }),
+      ),
+    }),
+    execute: async (args, api, context) => {
+      const chatId = await getChatId(api, api.conversationId, context);
+      const replyParameters = args.reply_to ? { reply_parameters: { message_id: args.reply_to } } : {};
+      // Plain text only: no parse_mode. Trevor formats with line breaks, bullets and emoji.
+      const sent = await bot.api.sendMessage(chatId, args.text, replyParameters);
+      logger.info("Tool: send_message", { chatId, messageId: sent.message_id, length: args.text.length });
+
+      return { ...text(`Sent as message ${sent.message_id}.`), control: { terminate: true } };
+    },
+  });
+}
+
+/**
+ * Wraps a tool that does real work: logs how it went, and shows "typing…" in the chat while it runs.
+ * Telegram clears that status after ~5s, so it is refreshed until the tool is done.
+ */
+function instrument<TParameters extends TSchema>(
+  bot: Bot,
+  tool: ToolRegistration<TParameters>,
+): ToolRegistration<TParameters> {
+  return {
+    ...tool,
+    execute: async (args, api, context) => {
+      const chatId = await getChatId(api, api.conversationId, context);
+      const sendTyping = () => bot.api.sendChatAction(chatId, "typing").catch(() => {});
+      sendTyping();
+      const interval = setInterval(sendTyping, TYPING_REFRESH_MS);
+      const elapsed = logger.time();
+
+      try {
+        const result = await tool.execute(args, api, context);
+        logger.info(`Tool: ${tool.name} done`, { chatId, latencyMs: elapsed() });
+        return result;
+      } catch (error) {
+        logger.error(`Tool: ${tool.name} failed`, { chatId, args, latencyMs: elapsed(), error });
+        throw error;
+      } finally {
+        clearInterval(interval);
+      }
     },
   };
 }
 
-const listQueueTool: AgentTool<typeof emptyParams> = {
-  name: "list_queue",
-  label: "List Queue",
-  description: "Show all pending booking requests in the queue.",
-  parameters: emptyParams,
-  execute: async () => {
-    const entries = await listPendingQueue();
-
-    if (entries.length === 0) {
-      return text("No pending requests in the queue.");
-    }
-
-    const result = entries.map((e) => ({
-      id: e.id,
-      date: e.date,
-      timeFrom: e.timeFrom,
-      timeTo: e.timeTo,
-      status: e.status,
-      createdAt: e.createdAt,
-    }));
-
-    return text(JSON.stringify(result, null, 2));
-  },
-};
-
-const removeFromQueueTool: AgentTool<typeof removeFromQueueParams> = {
-  name: "remove_from_queue",
-  label: "Remove from Queue",
-  description: "Cancel a pending booking request from the queue.",
-  parameters: removeFromQueueParams,
-  execute: async (_toolCallId, params) => {
-    logger.info("Tool: remove_from_queue", { id: params.id });
-    await removeFromQueue(params.id);
-    logger.info("Tool: remove_from_queue cancelled", { id: params.id });
-    return text(`Removed queue entry ${params.id}.`);
-  },
-};
-
-const recordScoreTool: AgentTool<typeof recordScoreParams> = {
-  name: "record_score",
-  label: "Record Score",
-  description: "Record the score of a squash session between two players (e.g. Jason 3 - 1 Amp).",
-  parameters: recordScoreParams,
-  execute: async (_toolCallId, params) => {
-    const elapsed = logger.time();
-    logger.info("Tool: record_score", { ...params });
-    try {
-      const entry = await recordScore(params.date, params.player1, params.player2, params.score1, params.score2);
-      logger.info("Tool: record_score completed", { id: entry.id, latencyMs: elapsed() });
-      return text(
-        `Score recorded: ${entry.player1} ${entry.score1} - ${entry.score2} ${entry.player2} on ${entry.date}`,
-      );
-    } catch (error) {
-      logger.error("Tool: record_score failed", { latencyMs: elapsed(), error });
-      throw error;
-    }
-  },
-};
-
-const listScoresTool: AgentTool<typeof listScoresParams> = {
-  name: "list_scores",
-  label: "List Scores",
-  description: "Show recent squash session scores.",
-  parameters: listScoresParams,
-  execute: async (_toolCallId, params) => {
-    const elapsed = logger.time();
-    logger.info("Tool: list_scores", { limit: params.limit });
-    try {
-      const entries = await listScores(params.limit);
-      logger.info("Tool: list_scores completed", { count: entries.length, latencyMs: elapsed() });
-
-      if (entries.length === 0) {
-        return text("No scores recorded yet.");
-      }
-
-      return text(JSON.stringify(entries, null, 2));
-    } catch (error) {
-      logger.error("Tool: list_scores failed", { latencyMs: elapsed(), error });
-      throw error;
-    }
-  },
-};
-
-const cancelReservationTool: AgentTool<typeof cancelReservationParams> = {
-  name: "cancel_reservation",
-  label: "Cancel Reservation",
-  description:
-    "Cancel one of the user's existing court reservations. Get the reservation_id from list_my_reservations first, and confirm with the user before calling this.",
-  parameters: cancelReservationParams,
-  execute: async (_toolCallId, params) => {
-    const elapsed = logger.time();
-    logger.info("Tool: cancel_reservation", { reservationId: params.reservation_id });
-    try {
-      const session = await getSession();
-      const result = await cancelReservation(params.reservation_id, session);
-
-      if (!result.success) {
-        logger.warn("Tool: cancel_reservation failed", {
-          reservationId: params.reservation_id,
-          error: result.error,
-          latencyMs: elapsed(),
-        });
-        return text(`Could not cancel the reservation: ${result.error}`);
-      }
-
-      // Best-effort: remove the matching calendar event
-      await deleteEvent(params.date, params.time).catch((err) =>
-        logger.warn("Tool: cancel_reservation calendar delete failed", { error: err }),
-      );
-
-      logger.info("Tool: cancel_reservation succeeded", {
-        reservationId: params.reservation_id,
-        latencyMs: elapsed(),
-      });
-      return text(`Cancelled the reservation on ${params.date} at ${params.time}.`);
-    } catch (error) {
-      logger.error("Tool: cancel_reservation threw", { reservationId: params.reservation_id, error });
-      throw error;
-    }
-  },
-};
-
-const listCourtPreferencesTool: AgentTool<typeof emptyParams> = {
-  name: "list_court_preferences",
-  label: "List Court Preferences",
-  description: "Show which courts are preferred and which are avoided when booking.",
-  parameters: emptyParams,
-  execute: async () => {
-    const preferences = await listCourtPreferences();
-
-    if (preferences.length === 0) {
-      return text("No court preferences set — all courts are treated equally.");
-    }
-
-    return text(JSON.stringify(preferences, null, 2));
-  },
-};
-
-const setCourtPreferenceTool: AgentTool<typeof setCourtPreferenceParams> = {
-  name: "set_court_preference",
-  label: "Set Court Preference",
-  description:
-    "Set how much a court is favoured when several are free at the same time. Use when the user says they like or dislike a court.",
-  parameters: setCourtPreferenceParams,
-  execute: async (_toolCallId, params) => {
-    const court = normalizeCourtName(params.court);
-
-    if (!court) {
-      return text(`"${params.court}" is not a court name. Courts are named Baan 1 through Baan 13.`);
-    }
-
-    logger.info("Tool: set_court_preference", { court, tier: params.tier });
-    await setCourtTier(court, params.tier);
-    return text(`${court} is now ${params.tier}.`);
-  },
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- AgentTool array requires any for contravariant execute params
-export function createTools(chatId: string): AgentTool<any>[] {
-  return [
+export function createTools(bot: Bot): ToolRegistration[] {
+  const workTools: ToolRegistration[] = [
     checkAvailability,
     bookCourt,
     listMyReservations,
-    makeAddToQueueTool(chatId),
-    listQueueTool,
+    cancelReservationTool,
+    addToQueueTool,
+    listQueue,
     removeFromQueueTool,
     recordScoreTool,
     listScoresTool,
-    cancelReservationTool,
     listCourtPreferencesTool,
     setCourtPreferenceTool,
   ];
+
+  return [...workTools.map((tool) => instrument(bot, tool)), createSendMessageTool(bot)];
 }

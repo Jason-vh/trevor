@@ -1,5 +1,6 @@
 import type { Bot } from "grammy";
 
+import type { Trevor } from "@/agent/trevor";
 import { bookSlot } from "@/modules/booking";
 import { confirmEvent, createConfirmedEvent } from "@/modules/calendar";
 import { getCourtTiers } from "@/modules/court-preferences";
@@ -14,7 +15,29 @@ function buildBookedMessage(slot: CourtAvailability): string {
   return `✅ A court opened up, so I booked it!\n\n🏸 ${slot.courtName}\n🗓️ ${slot.formattedDate}\n🕐 ${slot.formattedStartTime}`;
 }
 
-export async function processQueue(bot: Bot): Promise<void> {
+type QueueEntry = Awaited<ReturnType<typeof getProcessableEntries>>[number];
+
+async function announceBooking(bot: Bot, trevor: Trevor, entry: QueueEntry, slot: CourtAvailability) {
+  try {
+    if (entry.calendarEventId) {
+      await confirmEvent(entry.calendarEventId, slot.courtName, slot.dateISO, slot.formattedStartTime);
+    } else {
+      await createConfirmedEvent(slot.courtName, slot.dateISO, slot.formattedStartTime);
+    }
+  } catch (error) {
+    logger.warn("Queue: calendar update failed", { id: entry.id, error });
+  }
+
+  try {
+    const message = buildBookedMessage(slot);
+    await bot.api.sendMessage(entry.chatId, message);
+    await trevor.notice(entry.chatId, `The booking queue booked a court, and this was sent to the chat:\n${message}`);
+  } catch (error) {
+    logger.error("Queue: failed to announce booking", { id: entry.id, chatId: entry.chatId, error });
+  }
+}
+
+export async function processQueue(bot: Bot, trevor: Trevor): Promise<void> {
   const elapsed = logger.time();
 
   await resetStaleProcessingEntries();
@@ -64,21 +87,6 @@ export async function processQueue(bot: Bot): Promise<void> {
 
       if (result.success) {
         await setQueueStatus(entry.id, "booked");
-        try {
-          if (entry.calendarEventId) {
-            await confirmEvent(
-              entry.calendarEventId,
-              result.slot.courtName,
-              result.slot.dateISO,
-              result.slot.formattedStartTime,
-            );
-          } else {
-            await createConfirmedEvent(result.slot.courtName, result.slot.dateISO, result.slot.formattedStartTime);
-          }
-        } catch (calendarError) {
-          logger.warn("Queue: calendar update failed", { id: entry.id, error: calendarError });
-        }
-        await bot.api.sendMessage(entry.chatId, buildBookedMessage(result.slot));
         logger.info("Queue: entry booked", {
           id: entry.id,
           date: entry.date,
@@ -86,6 +94,8 @@ export async function processQueue(bot: Bot): Promise<void> {
           reservationId: result.reservationId,
         });
         booked++;
+        // The court is booked: nothing after this may put the entry back in the queue.
+        await announceBooking(bot, trevor, entry, result.slot);
       } else {
         await setQueueStatus(entry.id, "pending");
         logger.warn("Queue: booking failed for entry", { id: entry.id, date: entry.date, error: result.error });
