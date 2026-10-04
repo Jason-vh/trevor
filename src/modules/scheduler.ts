@@ -2,14 +2,14 @@ import type { Bot } from "grammy";
 
 import type { Trevor } from "@/agent/trevor";
 import { bookSlot } from "@/modules/booking";
-import { recordBookingOrigin } from "@/modules/booking-origins";
+import { getBookingOrigins, recordBookingOrigin } from "@/modules/booking-origins";
 import { confirmEvent, createConfirmedEvent } from "@/modules/calendar";
 import { getCourtTiers } from "@/modules/court-preferences";
 import { expirePastEntries, getProcessableEntries, resetStaleProcessingEntries, setQueueStatus } from "@/modules/queue";
 import { getSession } from "@/modules/session-manager";
 import { filterByTimeRange, getAllSlotsOnDate } from "@/modules/slots";
 import type { CourtAvailability } from "@/types";
-import { sortSlotsByPreference } from "@/utils/courts";
+import { slotKey, sortSlotsByPreference } from "@/utils/courts";
 import { logger } from "@/utils/logger";
 
 function buildBookedMessage(slot: CourtAvailability): string {
@@ -38,6 +38,15 @@ async function announceBooking(bot: Bot, trevor: Trevor, entry: QueueEntry, slot
   }
 }
 
+/** A court we already hold in the entry's window, booked for this chat or by hand on the website. */
+function findExistingBooking(entry: QueueEntry, slots: CourtAvailability[], origins: Map<string, string>) {
+  return slots.find((slot) => {
+    if (!slot.isOwnBooking) return false;
+    const origin = origins.get(slotKey(slot.formattedStartTime, slot.courtName));
+    return origin === undefined || origin === entry.chatId;
+  });
+}
+
 export async function processQueue(bot: Bot, trevor: Trevor): Promise<void> {
   const elapsed = logger.time();
 
@@ -57,6 +66,7 @@ export async function processQueue(bot: Bot, trevor: Trevor): Promise<void> {
   const courtTiers = await getCourtTiers();
 
   let booked = 0;
+  let alreadyBooked = 0;
   let failed = 0;
   let noSlots = 0;
 
@@ -67,6 +77,24 @@ export async function processQueue(bot: Bot, trevor: Trevor): Promise<void> {
       const dateObj = new Date(entry.date + "T12:00:00");
       const allSlots = await getAllSlotsOnDate(session, dateObj);
       const filtered = filterByTimeRange(allSlots, entry.timeFrom, entry.timeTo);
+
+      const origins = await getBookingOrigins(entry.date);
+      const existing = findExistingBooking(entry, filtered, origins);
+      if (existing) {
+        await setQueueStatus(entry.id, "booked");
+        // A court booked on the website has no chat yet; it does now, so it gets its reminder.
+        if (!origins.has(slotKey(existing.formattedStartTime, existing.courtName))) {
+          await recordBookingOrigin(entry.chatId, existing);
+        }
+        logger.info("Queue: already have a court in this window", {
+          id: entry.id,
+          date: entry.date,
+          court: existing.courtName,
+          time: existing.formattedStartTime,
+        });
+        alreadyBooked++;
+        continue;
+      }
       const available = sortSlotsByPreference(
         filtered.filter((s) => s.isAvailable),
         courtTiers,
@@ -78,6 +106,8 @@ export async function processQueue(bot: Bot, trevor: Trevor): Promise<void> {
           date: entry.date,
           timeFrom: entry.timeFrom,
           timeTo: entry.timeTo,
+          // 0 means SquashCity hasn't opened the day yet
+          slotsOnDay: allSlots.length,
         });
         await setQueueStatus(entry.id, "pending");
         noSlots++;
@@ -113,6 +143,7 @@ export async function processQueue(bot: Bot, trevor: Trevor): Promise<void> {
   logger.info("Queue: run complete", {
     entryCount: entries.length,
     booked,
+    alreadyBooked,
     noSlots,
     failed,
     latencyMs: elapsed(),

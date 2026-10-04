@@ -6,15 +6,16 @@ import { getChatId } from "@/agent/chats";
 import { bookSlot } from "@/modules/booking";
 import { recordBookingOrigin } from "@/modules/booking-origins";
 import { cancelReservation } from "@/modules/cancel";
-import { createConfirmedEvent, createTentativeEvent, deleteEvent } from "@/modules/calendar";
+import { createConfirmedEvent, deleteEvent } from "@/modules/calendar";
 import { getCourtTiers, listCourtPreferences, setCourtTier } from "@/modules/court-preferences";
-import { addToQueue, listPendingQueue, removeFromQueue, setQueueCalendarEventId } from "@/modules/queue";
+import { enqueue, listPendingQueue, removeFromQueue } from "@/modules/queue";
+import { addRecurringBooking, listRecurringBookings, stopRecurringBooking } from "@/modules/recurring";
 import { getUpcomingReservations } from "@/modules/reservations";
 import { listScores, recordScore } from "@/modules/scores";
 import { getSession } from "@/modules/session-manager";
 import { filterByTimeRange, getAllSlotsOnDate } from "@/modules/slots";
 import { getTier, normalizeCourtName, sortSlotsByPreference } from "@/utils/courts";
-import { getCurrentDateISO, getMinutesUntil } from "@/utils/datetime";
+import { getCurrentDateISO, getMinutesUntil, WEEKDAYS } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
 
 const TYPING_REFRESH_MS = 4_000;
@@ -191,11 +192,8 @@ const addToQueueTool = defineTool({
     }
 
     const chatId = await getChatId(api, api.conversationId, context);
-    const entry = await addToQueue(chatId, args.date, args.time_from, args.time_to);
+    const entry = await enqueue({ chatId, date: args.date, timeFrom: args.time_from, timeTo: args.time_to });
     logger.info("Tool: add_to_queue", { id: entry.id, ...args });
-
-    const eventId = await createTentativeEvent(args.date, args.time_from, args.time_to);
-    if (eventId) await setQueueCalendarEventId(entry.id, eventId);
 
     return text(
       `Added to queue (ID: ${entry.id}). It is retried every 5 minutes and books the first court that opens up.`,
@@ -216,6 +214,7 @@ const listQueue = defineTool({
         date: entry.date,
         timeFrom: entry.timeFrom,
         timeTo: entry.timeTo,
+        weekly: entry.recurringBookingId !== null,
         createdAt: entry.createdAt,
       })),
     );
@@ -232,6 +231,51 @@ const removeFromQueueTool = defineTool({
     await removeFromQueue(args.id);
     logger.info("Tool: remove_from_queue", { id: args.id });
     return text(`Removed queue entry ${args.id}.`);
+  },
+});
+
+const addRecurringBookingTool = defineTool({
+  name: "add_recurring_booking",
+  description:
+    "Book a court every week on the same day and time range, for this chat. Each week is queued once SquashCity opens that day, 7 days ahead, and booked as soon as a court is free. To skip a week, remove that week's entry with remove_from_queue.",
+  parameters: Type.Object({
+    weekday: Type.Union(WEEKDAYS.map((day) => Type.Literal(day))),
+    time_from: Type.String({ description: "Earliest start time HH:MM" }),
+    time_to: Type.String({ description: "Latest start time HH:MM" }),
+  }),
+  execute: async (args, api, context) => {
+    const chatId = await getChatId(api, api.conversationId, context);
+    const rule = await addRecurringBooking(chatId, args.weekday, args.time_from, args.time_to);
+    const weeks = (await listPendingQueue()).filter((entry) => entry.recurringBookingId === rule.id);
+
+    return json({ weeklyBookingId: rule.id, queuedWeeks: weeks.map((entry) => entry.date) });
+  },
+});
+
+const listRecurringBookingsTool = defineTool({
+  name: "list_recurring_bookings",
+  description: "Show this chat's weekly bookings.",
+  parameters: Type.Object({}),
+  execute: async (_args, api, context) => {
+    const rules = await listRecurringBookings(await getChatId(api, api.conversationId, context));
+    if (rules.length === 0) return text("No weekly bookings in this chat.");
+    return json(
+      rules.map((rule) => ({ id: rule.id, weekday: rule.weekday, timeFrom: rule.timeFrom, timeTo: rule.timeTo })),
+    );
+  },
+});
+
+const stopRecurringBookingTool = defineTool({
+  name: "stop_recurring_booking",
+  description:
+    "Stop a weekly booking. Withdraws the weeks it queued that aren't booked yet; courts already booked stay booked.",
+  parameters: Type.Object({
+    id: Type.Number({ description: "Weekly booking ID from list_recurring_bookings" }),
+  }),
+  execute: async (args, api, context) => {
+    const stopped = await stopRecurringBooking(args.id, await getChatId(api, api.conversationId, context));
+    if (!stopped) return text("No such weekly booking in this chat.");
+    return text("Stopped the weekly booking. Courts that were already booked stay booked.");
   },
 });
 
@@ -366,6 +410,9 @@ export function createTools(bot: Bot): ToolRegistration[] {
     addToQueueTool,
     listQueue,
     removeFromQueueTool,
+    addRecurringBookingTool,
+    listRecurringBookingsTool,
+    stopRecurringBookingTool,
     recordScoreTool,
     listScoresTool,
     listCourtPreferencesTool,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { formatMessageTime, getMinutesUntil } from "./datetime";
+import { addDaysISO, formatMessageTime, getMinutesUntil, getWeekdayDates } from "./datetime";
 
 describe("getMinutesUntil", () => {
   // 14:00 in Amsterdam (CEST)
@@ -28,5 +28,17 @@ describe("getMinutesUntil", () => {
 describe("formatMessageTime", () => {
   test("shows the weekday, date and Amsterdam time", () => {
     expect(formatMessageTime(new Date("2026-07-21T16:05:00Z"))).toBe("Tue 21 Jul 2026 18:05");
+  });
+});
+
+describe("getWeekdayDates", () => {
+  test("lists every matching weekday in the range, including both ends", () => {
+    // 2026-10-06 is a Tuesday
+    expect(getWeekdayDates("tuesday", "2026-10-06", 14)).toEqual(["2026-10-06", "2026-10-13", "2026-10-20"]);
+  });
+
+  test("crosses month and year boundaries", () => {
+    expect(getWeekdayDates("thursday", "2026-12-28", 7)).toEqual(["2026-12-31"]);
+    expect(addDaysISO("2026-12-31", 1)).toBe("2027-01-01");
   });
 });

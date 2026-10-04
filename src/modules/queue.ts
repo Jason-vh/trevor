@@ -1,8 +1,10 @@
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, desc, eq, lt, lte } from "drizzle-orm";
 
 import { db } from "@/db";
 import { queue } from "@/db/schema";
-import { getCurrentDateISO } from "@/utils/datetime";
+import { createTentativeEvent } from "@/modules/calendar";
+import { BOOKING_HORIZON_DAYS } from "@/constants";
+import { addDaysISO, getCurrentDateISO } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
 
 export async function resetStaleProcessingEntries() {
@@ -19,17 +21,24 @@ export async function resetStaleProcessingEntries() {
   }
 }
 
-export async function addToQueue(chatId: string, date: string, timeFrom: string, timeTo: string) {
+/** Queues a booking request, with a placeholder event in the calendar. */
+export async function enqueue(request: {
+  chatId: string;
+  date: string;
+  timeFrom: string;
+  timeTo: string;
+  recurringBookingId?: number;
+}) {
   const [entry] = await db
     .insert(queue)
-    .values({
-      chatId,
-      date,
-      timeFrom,
-      timeTo,
-      status: "pending",
-    })
+    .values({ ...request, status: "pending" })
     .returning();
+
+  const calendarEventId = await createTentativeEvent(request.date, request.timeFrom, request.timeTo);
+  if (calendarEventId) {
+    await db.update(queue).set({ calendarEventId }).where(eq(queue.id, entry.id));
+  }
+
   return entry;
 }
 
@@ -41,16 +50,17 @@ export async function removeFromQueue(id: number) {
   await db.update(queue).set({ status: "cancelled", updatedAt: new Date() }).where(eq(queue.id, id));
 }
 
+/** Pending entries for dates SquashCity already takes bookings for. */
 export async function getProcessableEntries() {
-  return db.select().from(queue).where(eq(queue.status, "pending"));
+  const lastOpenDate = addDaysISO(getCurrentDateISO(), BOOKING_HORIZON_DAYS);
+  return db
+    .select()
+    .from(queue)
+    .where(and(eq(queue.status, "pending"), lte(queue.date, lastOpenDate)));
 }
 
 export async function setQueueStatus(id: number, status: string) {
   await db.update(queue).set({ status, updatedAt: new Date() }).where(eq(queue.id, id));
-}
-
-export async function setQueueCalendarEventId(id: number, calendarEventId: string) {
-  await db.update(queue).set({ calendarEventId, updatedAt: new Date() }).where(eq(queue.id, id));
 }
 
 export async function listRecentQueue() {

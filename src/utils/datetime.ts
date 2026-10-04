@@ -47,3 +47,23 @@ export function getMinutesUntil(
   const days = (Date.parse(dateISO) - Date.parse(getCurrentDateISO(timeZone, now))) / 86_400_000;
   return days * 24 * 60 + getTimeInMinutes(time) - getTimeInMinutes(getCurrentTime(timeZone, now));
 }
+
+export const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
+export type Weekday = (typeof WEEKDAYS)[number];
+
+export function addDaysISO(dateISO: string, days: number): string {
+  const date = new Date(`${dateISO}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+export function getWeekday(dateISO: string): Weekday {
+  return WEEKDAYS[new Date(`${dateISO}T00:00:00Z`).getUTCDay()];
+}
+
+/** The dates falling on `weekday` from `fromISO` up to and including `days` days later. */
+export function getWeekdayDates(weekday: Weekday, fromISO: string, days: number): string[] {
+  return Array.from({ length: days + 1 }, (_, offset) => addDaysISO(fromISO, offset)).filter(
+    (dateISO) => getWeekday(dateISO) === weekday,
+  );
+}

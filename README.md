@@ -12,6 +12,7 @@ Trevor books squash courts at [SquashCity](https://squashcity.baanreserveren.nl/
 - 🔍 **Checks availability** for any date and time.
 - 🤖 **Books courts** straight away, picking preferred courts when several are free at the same time. Courts starting within 6 hours need a clear yes first, since they can't be cancelled for free.
 - 📋 **Queues requests** when nothing is free, and books the first matching court that opens up (checked every 5 minutes).
+- 🔁 **Weekly bookings** ("every Tuesday at 18:30"): each week is queued once SquashCity opens the day, 7 days ahead, and booked from there. Skip the coming week by removing it from the queue.
 - 📅 **Shows and cancels reservations**, and keeps a Google Calendar in sync.
 - 🏆 **Keeps match scores**.
 - ⏰ **Reminds the chat** in the morning when there's squash that day, in the chat that booked the court.
@@ -25,7 +26,7 @@ Telegram → grammY → pi-durable conversation (one per chat) → Claude + tool
 1. Every message in an allowed chat is stored in that chat's durable conversation, with who sent it and when.
 2. Trevor (Claude Sonnet 5.5) reads it and decides whether it asks something of him. If it does, he uses his tools and answers with `send_message`, the only way he can speak. Otherwise he stays quiet.
 3. Conversations, model turns and tool calls are committed to SQLite as they happen ([pi-durable](https://github.com/earendil-works/pi)), so a restart mid-turn picks up where it stopped.
-4. Every 5 minutes, an in-process cron job works through the booking queue, and from 09:00 asks Trevor to remind each chat of the courts it booked for today. Queue bookings are written into the conversation as notices, so Trevor knows about them.
+4. Every 5 minutes, an in-process cron job tops up weekly bookings and works through the booking queue, and from 09:00 asks Trevor to remind each chat of the courts it booked for today. Queue bookings are written into the conversation as notices, so Trevor knows about them.
 
 SquashCity has no API: Trevor logs in like a browser and scrapes the reservation pages.
 
@@ -38,6 +39,7 @@ SquashCity has no API: Trevor logs in like a browser and scrapes the reservation
 | `list_my_reservations` | Upcoming bookings |
 | `cancel_reservation` | Cancels a booking |
 | `add_to_queue` / `list_queue` / `remove_from_queue` | The booking queue |
+| `add_recurring_booking` / `list_recurring_bookings` / `stop_recurring_booking` | Weekly bookings |
 | `record_score` / `list_scores` | Match scores |
 | `set_court_preference` / `list_court_preferences` | Preferred and avoided courts |
 | `send_message` | Says something in the chat |

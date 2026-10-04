@@ -13,8 +13,21 @@ export const queue = sqliteTable("queue", {
   timeTo: text("time_to").notNull(),
   status: text("status").notNull().default("pending"),
   calendarEventId: text("calendar_event_id"),
+  /** Set when a weekly booking created this entry. */
+  recurringBookingId: integer("recurring_booking_id"),
   createdAt: timestamp("created_at"),
   updatedAt: timestamp("updated_at"),
+});
+
+/** A court to book every week, e.g. Tuesdays between 18:30 and 19:00. */
+export const recurringBookings = sqliteTable("recurring_bookings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  chatId: text("chat_id").notNull(),
+  weekday: text("weekday").notNull(),
+  timeFrom: text("time_from").notNull(),
+  timeTo: text("time_to").notNull(),
+  createdAt: timestamp("created_at"),
+  stoppedAt: integer("stopped_at", { mode: "timestamp_ms" }),
 });
 
 export const metadata = sqliteTable("metadata", {
