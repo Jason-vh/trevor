@@ -90,20 +90,6 @@ docker compose cp app:/app/data ./trevor-data-backup
 docker compose start app
 ```
 
-### Moving off Postgres (one-time)
-
-Trevor used to keep its data in the shared Postgres. After the first deploy
-on SQLite, copy it over once:
-
-```bash
-docker compose exec -e POSTGRES_URL='postgresql://trevor:<password>@postgres:5432/trevor' \
-  app bun run scripts/import-postgres.ts
-```
-
-It refuses to run if SQLite already has data. Once it has run, the
-`trevor` database, its role and the `TREVOR_DB_PASSWORD` secret can go,
-and so can the `apps-net` network in `docker-compose.yml`.
-
 ## Operations
 
 ```bash
