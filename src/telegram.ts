@@ -17,6 +17,15 @@ function senderName(user: User | undefined, me: User): string {
   return [user.first_name, user.last_name].filter(Boolean).join(" ");
 }
 
+const NAME_PATTERN = /\btrevor\b/i;
+
+/** Whether the message is clearly meant for Trevor: a private chat, his name or @mention, or a reply to him. */
+function isAddressedToTrevor(ctx: Context, message: Message.TextMessage): boolean {
+  if (message.chat.type === "private") return true;
+  if (message.text.includes(`@${ctx.me.username}`) || NAME_PATTERN.test(message.text)) return true;
+  return message.reply_to_message?.from?.id === ctx.me.id;
+}
+
 function toChatMessage(ctx: Context, message: Message.TextMessage): ChatMessage {
   const replyTo = message.reply_to_message;
 
@@ -25,16 +34,10 @@ function toChatMessage(ctx: Context, message: Message.TextMessage): ChatMessage 
     messageId: message.message_id,
     sender: senderName(message.from, ctx.me),
     text: message.text,
+    addressedToTrevor: isAddressedToTrevor(ctx, message),
     sentAt: new Date(message.date * 1000),
     replyTo: replyTo ? { messageId: replyTo.message_id, sender: senderName(replyTo.from, ctx.me) } : undefined,
   };
-}
-
-/** Whether the message is clearly meant for Trevor: a private chat, an @mention, or a reply to him. */
-function isAddressedToTrevor(ctx: Context, message: Message.TextMessage): boolean {
-  if (message.chat.type === "private") return true;
-  if (message.text.includes(`@${ctx.me.username}`)) return true;
-  return message.reply_to_message?.from?.id === ctx.me.id;
 }
 
 /**
@@ -62,11 +65,11 @@ export function handleMessages(bot: Bot, trevor: Trevor) {
     }
 
     // Trevor sees every message, and decides himself whether it asks something of him.
-    const message = ctx.message;
-    const submission = await trevor.receive(toChatMessage(ctx, message));
-    logger.info("Telegram: message received", { chatId, messageId: message.message_id });
+    const message = toChatMessage(ctx, ctx.message);
+    const submission = await trevor.receive(message);
+    logger.info("Telegram: message received", { chatId, messageId: message.messageId });
 
-    if (isAddressedToTrevor(ctx, message)) {
+    if (message.addressedToTrevor) {
       reportFailure(bot, submission, chatId);
     }
   });

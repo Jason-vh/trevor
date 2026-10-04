@@ -6,7 +6,9 @@ import {
   type ConversationId,
   createRegistry,
   defineExtension,
+  GenerationTask,
   Harness,
+  hook,
   type ModelRef,
   section,
   type Submission,
@@ -14,6 +16,7 @@ import {
 import type { Bot } from "grammy";
 
 import { ChatDoc, ChatsDoc, getChatId } from "@/agent/chats";
+import { keepRecentMessages } from "@/agent/context-window";
 import { type ChatMessage, formatChatMessage, formatNotice } from "@/agent/messages";
 import { openConversationStorage } from "@/agent/storage";
 import { GROUP_CHAT, PRIVATE_CHAT, SYSTEM_PROMPT } from "@/agent/system-prompt";
@@ -25,11 +28,9 @@ const context = BACKGROUND_CONTEXT;
 const MODEL: ModelRef = { provider: "anthropic", modelId: "claude-sonnet-5-5" };
 const THINKING_LEVEL = "low";
 
-// Every request carries the chat's whole active context, so keep it small: once it grows past
-// this many tokens, older messages are compacted into a summary.
-const MAX_CONTEXT_TOKENS = 50_000;
-const KEEP_RECENT_TOKENS = 15_000;
-const BACKGROUND_COMPACTION_TOKENS = 10_000;
+// Trevor reads every message in a group, so each one is a model request: keep them small by
+// sending only the most recent messages rather than the whole chat.
+const RECENT_MESSAGES = 20;
 
 export interface Trevor {
   /** Durably hands a chat message to Trevor. He works on it in the background and answers through send_message. */
@@ -43,8 +44,9 @@ export async function startTrevor(bot: Bot, storagePath: string): Promise<Trevor
   const models = createModels();
   models.setProvider(anthropicProvider());
 
-  const model = models.getModel(MODEL.provider, MODEL.modelId);
-  if (!model) throw new Error(`Unknown model ${MODEL.provider}/${MODEL.modelId}`);
+  if (!models.getModel(MODEL.provider, MODEL.modelId)) {
+    throw new Error(`Unknown model ${MODEL.provider}/${MODEL.modelId}`);
+  }
 
   const registry = createRegistry();
   registry.install(
@@ -59,6 +61,11 @@ export async function startTrevor(bot: Bot, storagePath: string): Promise<Trevor
           return chatId.startsWith("-") ? GROUP_CHAT : PRIVATE_CHAT;
         }),
       ],
+      hooks: [
+        hook(GenerationTask, {
+          beforeRequest: ({ messages }) => ({ messages: keepRecentMessages(messages, RECENT_MESSAGES) }),
+        }),
+      ],
     }),
   );
 
@@ -71,11 +78,8 @@ export async function startTrevor(bot: Bot, storagePath: string): Promise<Trevor
         // Messages that arrive while Trevor works join that work at the next step, all at once.
         steeringMode: "all",
         followUpMode: "all",
-        compaction: {
-          reserveTokens: model.contextWindow - MAX_CONTEXT_TOKENS,
-          keepRecentTokens: KEEP_RECENT_TOKENS,
-          backgroundTokens: BACKGROUND_COMPACTION_TOKENS,
-        },
+        // The context window below keeps requests small, so there is nothing to summarize.
+        compaction: { enabled: false },
       },
       onReport: (error) => logger.error("Trevor: extension failure", { error }),
     },

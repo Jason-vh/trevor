@@ -308,6 +308,11 @@ function createSendMessageTool(bot: Bot) {
       ),
     }),
     execute: async (args, api, context) => {
+      // Models sometimes "stay quiet" by sending nothing; Telegram rejects empty messages.
+      if (!args.text.trim()) {
+        return { ...text("Nothing sent."), control: { terminate: true } };
+      }
+
       const chatId = await getChatId(api, api.conversationId, context);
       const replyParameters = args.reply_to ? { reply_parameters: { message_id: args.reply_to } } : {};
       // Plain text only: no parse_mode. Trevor formats with line breaks, bullets and emoji.

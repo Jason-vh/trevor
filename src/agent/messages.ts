@@ -5,6 +5,8 @@ export type ChatMessage = {
   messageId: number;
   sender: string;
   text: string;
+  /** Names or @mentions Trevor, replies to him, or is in a private chat with him. */
+  addressedToTrevor: boolean;
   sentAt: Date;
   replyTo?: { messageId: number; sender: string };
 };
@@ -14,6 +16,9 @@ export function formatChatMessage(message: ChatMessage): string {
   const details = [`message ${message.messageId} from ${message.sender}`, formatMessageTime(message.sentAt)];
   if (message.replyTo) {
     details.push(`replying to message ${message.replyTo.messageId} from ${message.replyTo.sender}`);
+  }
+  if (message.addressedToTrevor) {
+    details.push("to you");
   }
   return `[${details.join(", ")}]\n${message.text}`;
 }
