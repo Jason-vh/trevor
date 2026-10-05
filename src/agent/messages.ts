@@ -5,7 +5,7 @@ export type ChatMessage = {
   messageId: number;
   sender: string;
   text: string;
-  /** Names or @mentions Trevor, replies to him, or is in a private chat with him. */
+  /** @mentions Trevor, replies to him, or is in a private chat with him: the messages that wake him. */
   addressedToTrevor: boolean;
   sentAt: Date;
   replyTo?: { messageId: number; sender: string };

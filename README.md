@@ -4,11 +4,11 @@
   <img src="trevor.png" alt="Trevor the Squash Bot" width="200">
 </div>
 
-Trevor books squash courts at [SquashCity](https://squashcity.baanreserveren.nl/) from a Telegram group chat. He reads along, and when someone asks him for something ("Trevor, book Tuesday 18:30"), he does it: checks what's free, books the best court, or queues the request and keeps retrying until a court opens up.
+Trevor books squash courts at [SquashCity](https://squashcity.baanreserveren.nl/) from a Telegram group chat. He reads along, and when someone @mentions him or replies to him ("@trevor book Tuesday 18:30"), he does it: checks what's free, books the best court, or queues the request and keeps retrying until a court opens up.
 
 ## What Trevor Does
 
-- 💬 **Reads the group chat** — no @ needed. He acts on direct requests and stays quiet while people talk among themselves.
+- 💬 **Reads the group chat** for context, but only answers when he's @mentioned or replied to.
 - 🔍 **Checks availability** for any date and time.
 - 🤖 **Books courts** straight away, picking preferred courts when several are free at the same time. Courts starting within 6 hours need a clear yes first, since they can't be cancelled for free.
 - 📋 **Queues requests** when nothing is free, and books the first matching court that opens up (checked every 5 minutes).
@@ -24,7 +24,7 @@ Telegram → grammY → pi-durable conversation (one per chat) → Claude + tool
 ```
 
 1. Every message in an allowed chat is stored in that chat's durable conversation, with who sent it and when.
-2. Trevor (Claude Sonnet 5.5) reads it and decides whether it asks something of him. If it does, he uses his tools and answers with `send_message`, the only way he can speak. Otherwise he stays quiet.
+2. Messages that @mention Trevor, reply to him, or come from a private chat wake him (Claude Sonnet 5.5). He reads them with the rest of the chat for context, uses his tools, and answers with `send_message`, the only way he can speak. Other messages only join his context.
 3. Conversations, model turns and tool calls are committed to SQLite as they happen ([pi-durable](https://github.com/earendil-works/pi)), so a restart mid-turn picks up where it stopped.
 4. Every 5 minutes, an in-process cron job tops up weekly bookings and works through the booking queue, and from 09:00 asks Trevor to remind each chat of the courts it booked for today. Queue bookings are written into the conversation as notices, so Trevor knows about them.
 

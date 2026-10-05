@@ -28,13 +28,15 @@ const context = BACKGROUND_CONTEXT;
 const MODEL: ModelRef = { provider: "anthropic", modelId: "claude-sonnet-5-5" };
 const THINKING_LEVEL = "low";
 
-// Trevor reads every message in a group, so each one is a model request: keep them small by
-// sending only the most recent messages rather than the whole chat.
+// Trevor reads every message in a group, so the chat grows quickly: keep requests small by sending
+// only the most recent messages rather than the whole chat.
 const RECENT_MESSAGES = 20;
 
 export interface Trevor {
-  /** Durably hands a chat message to Trevor. He works on it in the background and answers through send_message. */
+  /** Durably hands a chat message meant for Trevor to him. He works on it in the background and answers through send_message. */
   receive(message: ChatMessage): Promise<Submission>;
+  /** Adds a chat message that isn't meant for Trevor to his conversation, without waking him. */
+  overhear(message: ChatMessage): Promise<void>;
   /** Tells Trevor about something that happened outside the chat, without asking him to act on it. */
   notice(chatId: string, text: string): Promise<void>;
   /**
@@ -147,6 +149,21 @@ export async function startTrevor(bot: Bot, storagePath: string): Promise<Trevor
           content: formatChatMessage(message),
           requestId: `telegram:${message.messageId}`,
           whenBusy: "steer",
+        },
+        context,
+      );
+    },
+
+    async overhear(message) {
+      const conversation = await conversationFor(message.chatId);
+      await conversation.submit(
+        {
+          type: "write",
+          entry: {
+            kind: "trevor.chat_message",
+            model: [{ role: "user", content: formatChatMessage(message), timestamp: message.sentAt.getTime() }],
+          },
+          requestId: `telegram:${message.messageId}`,
         },
         context,
       );
