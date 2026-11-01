@@ -6,7 +6,7 @@ const styles = await Bun.file(new URL("./styles.css", import.meta.url)).text();
 
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 const STATUS_ORDER: SessionStatus[] = ["booked", "queued", "weekly"];
-const STATUS_LABELS: Record<SessionStatus, string> = { booked: "Booked", queued: "Queued", weekly: "Weekly" };
+const STATUS_LABELS: Record<SessionStatus, string> = { booked: "Booked", queued: "Queued", weekly: "Recurring" };
 
 const OPEN_DETAILS_SCRIPT = `
 for (const button of document.querySelectorAll("[data-details]")) {
@@ -165,7 +165,7 @@ function renderPage(main: Html, after: Html | string = ""): string {
             <ul class="legend">
               <li><i class="swatch is-booked"></i>Booked</li>
               <li><i class="swatch is-queued"></i>Queued</li>
-              <li><i class="swatch is-weekly"></i>Weekly</li>
+              <li><i class="swatch is-weekly"></i>Recurring</li>
             </ul>
           </header>
           ${main}
