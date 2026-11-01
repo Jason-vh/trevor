@@ -2,7 +2,7 @@ import { and, desc, eq, lt, lte } from "drizzle-orm";
 
 import { db } from "@/db";
 import { queue } from "@/db/schema";
-import { createTentativeEvent } from "@/modules/calendar";
+import { cancelPlaceholders, createPlaceholder } from "@/modules/calendar";
 import { BOOKING_HORIZON_DAYS } from "@/constants";
 import { addDaysISO, getCurrentDateISO } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
@@ -34,10 +34,8 @@ export async function enqueue(request: {
     .values({ ...request, status: "pending" })
     .returning();
 
-  const calendarEventId = await createTentativeEvent(request.date, request.timeFrom, request.timeTo);
-  if (calendarEventId) {
-    await db.update(queue).set({ calendarEventId }).where(eq(queue.id, entry.id));
-  }
+  const calendarEventId = await createPlaceholder(request.date, request.timeFrom, request.timeTo);
+  await db.update(queue).set({ calendarEventId }).where(eq(queue.id, entry.id));
 
   return entry;
 }
@@ -47,7 +45,12 @@ export async function listPendingQueue() {
 }
 
 export async function removeFromQueue(id: number) {
-  await db.update(queue).set({ status: "cancelled", updatedAt: new Date() }).where(eq(queue.id, id));
+  const removed = await db
+    .update(queue)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(eq(queue.id, id))
+    .returning({ calendarEventId: queue.calendarEventId });
+  await cancelPlaceholders(removed.map((entry) => entry.calendarEventId));
 }
 
 /** Pending entries for dates SquashCity already takes bookings for. */
@@ -73,8 +76,9 @@ export async function expirePastEntries() {
     .update(queue)
     .set({ status: "expired", updatedAt: new Date() })
     .where(and(eq(queue.status, "pending"), lt(queue.date, today)))
-    .returning({ id: queue.id });
+    .returning({ id: queue.id, calendarEventId: queue.calendarEventId });
   if (result.length > 0) {
     logger.info("Queue: expired past entries", { expiredCount: result.length, expiredIds: result.map((r) => r.id) });
+    await cancelPlaceholders(result.map((entry) => entry.calendarEventId));
   }
 }

@@ -3,6 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { BOOKING_HORIZON_DAYS } from "@/constants";
 import { db } from "@/db";
 import { queue, recurringBookings } from "@/db/schema";
+import { cancelPlaceholders } from "@/modules/calendar";
 import { enqueue } from "@/modules/queue";
 import { getCurrentDateISO, getMinutesUntil, getWeekdayDates, type Weekday } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
@@ -34,10 +35,12 @@ export async function stopRecurringBooking(id: number, chatId: string): Promise<
 
   if (stopped.length === 0) return false;
 
-  await db
+  const withdrawn = await db
     .update(queue)
     .set({ status: "cancelled", updatedAt: new Date() })
-    .where(and(eq(queue.recurringBookingId, id), eq(queue.status, "pending")));
+    .where(and(eq(queue.recurringBookingId, id), eq(queue.status, "pending")))
+    .returning({ calendarEventId: queue.calendarEventId });
+  await cancelPlaceholders(withdrawn.map((entry) => entry.calendarEventId));
 
   logger.info("Recurring: stopped", { id, chatId });
   return true;

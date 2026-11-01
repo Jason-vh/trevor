@@ -6,7 +6,7 @@ import { getChatId } from "@/agent/chats";
 import { bookSlot } from "@/modules/booking";
 import { recordBookingOrigin } from "@/modules/booking-origins";
 import { cancelReservation } from "@/modules/cancel";
-import { createConfirmedEvent, deleteEvent } from "@/modules/calendar";
+import { cancelBooking, confirmBooking } from "@/modules/calendar";
 import { getCourtTiers, listCourtPreferences, setCourtTier } from "@/modules/court-preferences";
 import { enqueue, listPendingQueue, removeFromQueue } from "@/modules/queue";
 import { addRecurringBooking, listRecurringBookings, stopRecurringBooking } from "@/modules/recurring";
@@ -123,9 +123,12 @@ const bookCourt = defineTool({
 
     logger.info("Tool: book_court succeeded", { ...args, courtName: slot.courtName });
     await recordBookingOrigin(await getChatId(api, api.conversationId, context), slot);
-    await createConfirmedEvent(slot.courtName, slot.dateISO, slot.formattedStartTime).catch((error) =>
-      logger.warn("Tool: book_court calendar event failed", { error }),
-    );
+    await confirmBooking({
+      calendarEventId: null,
+      courtName: slot.courtName,
+      date: slot.dateISO,
+      time: slot.formattedStartTime,
+    }).catch((error) => logger.warn("Tool: book_court calendar event failed", { error }));
 
     return text(`Successfully booked ${slot.courtName} on ${slot.formattedDate} at ${slot.formattedStartTime}.`);
   },
@@ -161,7 +164,7 @@ const cancelReservationTool = defineTool({
     }
 
     logger.info("Tool: cancel_reservation succeeded", { reservationId: args.reservation_id });
-    await deleteEvent(args.date, args.time).catch((error) =>
+    await cancelBooking(args.date, args.time).catch((error) =>
       logger.warn("Tool: cancel_reservation calendar delete failed", { error }),
     );
 

@@ -10,7 +10,7 @@ and conventions live in <https://github.com/Jason-vh/vhtm.eu>.
 ## Architecture
 
 ```text
-Telegram, Browser, Google Calendar
+Telegram, Browser
   -> https://trevor.vhtm.eu
   -> exe.dev edge (TLS) -> vhtm-eu :8080 -> Caddy -> 127.0.0.1:3007
   -> Bun process (HTTP server + Telegram webhook + pi-durable agent + croner queue ticker)
@@ -44,6 +44,10 @@ privacy mode off: BotFather → `/setprivacy` → the bot → **Disable**.
 Telegram only applies that to groups the bot joins afterwards, so remove
 the bot from each group and add it back.
 
+## Calendar invites
+
+Invites go out from `trevor@vhtm.eu`, an alias and sending identity ("Trevor") on Jason's Fastmail account. Trevor calls `https://fastmail-send.int.exe.xyz` (`FASTMAIL_BASE_URL`, written by the deploy workflow), the exe.dev integration attached to `vm:vhtm-eu`, which adds the Fastmail token. It's shared with push; see its `deploy/README.md` for how the token and integration were set up.
+
 ## GitHub Actions secrets
 
 | Secret | Purpose |
@@ -52,7 +56,6 @@ the bot from each group and add it back.
 | `WEBHOOK_SECRET` | Random token sent in `X-Telegram-Bot-Api-Secret-Token`. |
 | `ANTHROPIC_API_KEY` | LLM. |
 | `SQUASH_CITY_USERNAME`, `SQUASH_CITY_PASSWORD` | SquashCity reservation site login. |
-| `CALENDAR_WEBHOOK_URL` | Google Apps Script Calendar sync (optional). |
 | `NODE_ENV`, `TZ` | Runtime config. |
 
 ## Deploy

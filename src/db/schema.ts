@@ -64,3 +64,19 @@ export const bookingOrigins = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.date, table.time, table.court] })],
 );
+
+/** A calendar invite Trevor sends from trevor@vhtm.eu: a placeholder while a request is queued, then the booked court. */
+export const calendarEvents = sqliteTable("calendar_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  date: text("date").notNull(),
+  timeFrom: text("time_from").notNull(),
+  timeTo: text("time_to").notNull(),
+  /** Null while the event is a placeholder for a queued request. */
+  court: text("court"),
+  sequence: integer("sequence").notNull().default(0),
+  /** The last sequence that went out by email; behind `sequence` until it's sent. */
+  sentSequence: integer("sent_sequence"),
+  cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
+  createdAt: timestamp("created_at"),
+  updatedAt: timestamp("updated_at"),
+});

@@ -3,7 +3,7 @@ import type { Bot } from "grammy";
 import type { Trevor } from "@/agent/trevor";
 import { bookSlot } from "@/modules/booking";
 import { getBookingOrigins, recordBookingOrigin } from "@/modules/booking-origins";
-import { confirmEvent, createConfirmedEvent } from "@/modules/calendar";
+import { confirmBooking } from "@/modules/calendar";
 import { getCourtTiers } from "@/modules/court-preferences";
 import { expirePastEntries, getProcessableEntries, resetStaleProcessingEntries, setQueueStatus } from "@/modules/queue";
 import { getSession } from "@/modules/session-manager";
@@ -18,16 +18,21 @@ function buildBookedMessage(slot: CourtAvailability): string {
 
 type QueueEntry = Awaited<ReturnType<typeof getProcessableEntries>>[number];
 
-async function announceBooking(bot: Bot, trevor: Trevor, entry: QueueEntry, slot: CourtAvailability) {
+async function putInCalendar(entry: QueueEntry, slot: CourtAvailability) {
   try {
-    if (entry.calendarEventId) {
-      await confirmEvent(entry.calendarEventId, slot.courtName, slot.dateISO, slot.formattedStartTime);
-    } else {
-      await createConfirmedEvent(slot.courtName, slot.dateISO, slot.formattedStartTime);
-    }
+    await confirmBooking({
+      calendarEventId: entry.calendarEventId,
+      courtName: slot.courtName,
+      date: slot.dateISO,
+      time: slot.formattedStartTime,
+    });
   } catch (error) {
     logger.warn("Queue: calendar update failed", { id: entry.id, error });
   }
+}
+
+async function announceBooking(bot: Bot, trevor: Trevor, entry: QueueEntry, slot: CourtAvailability) {
+  await putInCalendar(entry, slot);
 
   try {
     const message = buildBookedMessage(slot);
@@ -86,6 +91,7 @@ export async function processQueue(bot: Bot, trevor: Trevor): Promise<void> {
         if (!origins.has(slotKey(existing.formattedStartTime, existing.courtName))) {
           await recordBookingOrigin(entry.chatId, existing);
         }
+        await putInCalendar(entry, existing);
         logger.info("Queue: already have a court in this window", {
           id: entry.id,
           date: entry.date,

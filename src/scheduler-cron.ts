@@ -2,6 +2,7 @@ import { Cron } from "croner";
 import type { Bot } from "grammy";
 
 import type { Trevor } from "@/agent/trevor";
+import { syncCalendar } from "@/modules/calendar";
 import { setMetadata } from "@/modules/metadata";
 import { queueUpcomingWeeks } from "@/modules/recurring";
 import { sendDailyReminders } from "@/modules/reminders";
@@ -21,6 +22,7 @@ async function runTick(bot: Bot, trevor: Trevor) {
   }
 
   await sendDailyReminders(trevor).catch((error) => logger.error("Cron: reminders failed", { error }));
+  await syncCalendar();
   logger.info("Cron: done");
 }
 

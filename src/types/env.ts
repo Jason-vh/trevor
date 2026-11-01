@@ -6,7 +6,7 @@ declare module "bun" {
     TELEGRAM_CHAT_ID?: string;
     ANTHROPIC_API_KEY?: string;
     DATA_DIR?: string;
-    CALENDAR_WEBHOOK_URL?: string;
+    FASTMAIL_BASE_URL?: string;
     WEBHOOK_DOMAIN?: string;
     WEBHOOK_SECRET?: string;
     PORT?: string;

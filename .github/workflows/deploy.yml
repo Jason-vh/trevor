@@ -33,7 +33,7 @@ jobs:
           ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
           SQUASH_CITY_USERNAME=${{ secrets.SQUASH_CITY_USERNAME }}
           SQUASH_CITY_PASSWORD=${{ secrets.SQUASH_CITY_PASSWORD }}
-          CALENDAR_WEBHOOK_URL=${{ secrets.CALENDAR_WEBHOOK_URL }}
+          FASTMAIL_BASE_URL=https://fastmail-send.int.exe.xyz
           TREVOR_APP_HOST_PORT=3007
           COMPOSE_PROJECT_NAME=trevor
           EOF

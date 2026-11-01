@@ -13,7 +13,7 @@ Trevor books squash courts at [SquashCity](https://squashcity.baanreserveren.nl/
 - 🤖 **Books courts** straight away, picking preferred courts when several are free at the same time. Courts starting within 6 hours need a clear yes first, since they can't be cancelled for free.
 - 📋 **Queues requests** when nothing is free, and books the first matching court that opens up (checked every 5 minutes).
 - 🔁 **Weekly bookings** ("every Tuesday at 18:30"): each week is queued once SquashCity opens the day, 7 days ahead, and booked from there. Skip the coming week by removing it from the queue.
-- 📅 **Shows and cancels reservations**, and keeps a Google Calendar in sync.
+- 📅 **Shows and cancels reservations**, and sends everyone calendar invites from trevor@vhtm.eu: a placeholder while a request is queued, updated to the court once it's booked, and cancelled when it's withdrawn.
 - 🏆 **Keeps match scores**.
 - ⏰ **Reminds the chat** in the morning when there's squash that day, in the chat that booked the court.
 
@@ -29,6 +29,10 @@ Telegram → grammY → pi-durable conversation (one per chat) → Claude + tool
 4. Every 5 minutes, an in-process cron job tops up weekly bookings and works through the booking queue, and from 09:00 asks Trevor to remind each chat of the courts it booked for today. Queue bookings are written into the conversation as notices, so Trevor knows about them.
 
 SquashCity has no API: Trevor logs in like a browser and scrapes the reservation pages.
+
+### Calendar invites
+
+Trevor emails calendar invites from `trevor@vhtm.eu`, an alias on Jason's Fastmail account, to the account owner and everyone in `src/players.ts`. Each event is a row in `calendar_events` with a version (`sequence`) that goes up on every change, so updates and cancellations land on the same calendar entry. A change is sent straight away; one that fails is retried by the 5-minute cron. Emails are built with `ical-generator` and `nodemailer` (compose only) and sent through Fastmail's JMAP API (`src/modules/fastmail.ts`).
 
 ### Tools
 
@@ -76,7 +80,7 @@ SquashCity has no API: Trevor logs in like a browser and scrapes the reservation
 | `TELEGRAM_CHAT_ID` | Chats Trevor may talk in, comma-separated |
 | `ANTHROPIC_API_KEY` | Claude |
 | `DATA_DIR` | Where the SQLite files go (default `data`) |
-| `CALENDAR_WEBHOOK_URL` | Google Apps Script calendar sync (optional) |
+| `FASTMAIL_BASE_URL` | Fastmail JMAP through the exe.dev integration, for calendar invites (optional; unset, invites are only logged) |
 | `WEBHOOK_DOMAIN`, `WEBHOOK_SECRET` | Webhook mode, production only |
 
 ## Development

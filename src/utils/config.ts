@@ -20,7 +20,8 @@ export interface Config {
   /** SQLite file holding Trevor's conversations. */
   conversationsPath: string;
 
-  calendarWebhookUrl?: string;
+  /** Fastmail over JMAP through an exe.dev integration, which adds the token; unset, invites are only logged. */
+  fastmailBaseUrl?: string;
 
   webhook?: {
     domain: string;
@@ -59,7 +60,7 @@ export const config: Config = {
   },
   databasePath: `${dataDir}/trevor.db`,
   conversationsPath: `${dataDir}/conversations.db`,
-  calendarWebhookUrl: Bun.env.CALENDAR_WEBHOOK_URL,
+  fastmailBaseUrl: Bun.env.FASTMAIL_BASE_URL,
   webhook: Bun.env.WEBHOOK_DOMAIN
     ? {
         domain: Bun.env.WEBHOOK_DOMAIN,

@@ -67,3 +67,42 @@ export function getWeekdayDates(weekday: Weekday, fromISO: string, days: number)
     (dateISO) => getWeekday(dateISO) === weekday,
   );
 }
+
+/** "HH:MM" `minutes` later, e.g. 18:30 + 45 → "19:15". */
+export function addMinutesToTime(time: string, minutes: number): string {
+  const total = getTimeInMinutes(time) + minutes;
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${pad(Math.floor(total / 60) % 24)}:${pad(total % 60)}`;
+}
+
+function timeZoneOffset(instant: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+  }).formatToParts(instant);
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((each) => each.type === type)?.value);
+  const wallClock = Date.UTC(
+    part("year"),
+    part("month") - 1,
+    part("day"),
+    part("hour"),
+    part("minute"),
+    part("second"),
+  );
+  return wallClock - (instant - (instant % 1000));
+}
+
+/** The instant at which `time` on `dateISO` happens in `timeZone`. */
+export function zonedTimeToUtc(dateISO: string, time: string, timeZone: string = APP_TIME_ZONE): Date {
+  const [year, month, day] = dateISO.split("-").map(Number);
+  const [hours, minutes] = time.split(":").map(Number);
+  const wallClock = Date.UTC(year, month - 1, day, hours, minutes);
+  const guess = wallClock - timeZoneOffset(wallClock, timeZone);
+  return new Date(wallClock - timeZoneOffset(guess, timeZone));
+}

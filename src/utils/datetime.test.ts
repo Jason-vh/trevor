@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import { addDaysISO, formatMessageTime, getMinutesUntil, getWeekdayDates } from "./datetime";
+import {
+  addDaysISO,
+  addMinutesToTime,
+  formatMessageTime,
+  getMinutesUntil,
+  getWeekdayDates,
+  zonedTimeToUtc,
+} from "./datetime";
 
 describe("getMinutesUntil", () => {
   // 14:00 in Amsterdam (CEST)
@@ -40,5 +47,29 @@ describe("getWeekdayDates", () => {
   test("crosses month and year boundaries", () => {
     expect(getWeekdayDates("thursday", "2026-12-28", 7)).toEqual(["2026-12-31"]);
     expect(addDaysISO("2026-12-31", 1)).toBe("2027-01-01");
+  });
+});
+
+describe("addMinutesToTime", () => {
+  test("adds a booking's length", () => {
+    expect(addMinutesToTime("18:30", 45)).toBe("19:15");
+  });
+
+  test("wraps past midnight", () => {
+    expect(addMinutesToTime("23:30", 45)).toBe("00:15");
+  });
+});
+
+describe("zonedTimeToUtc", () => {
+  test("uses summer time in summer", () => {
+    expect(zonedTimeToUtc("2026-07-21", "18:30").toISOString()).toBe("2026-07-21T16:30:00.000Z");
+  });
+
+  test("uses winter time in winter", () => {
+    expect(zonedTimeToUtc("2026-12-01", "18:30").toISOString()).toBe("2026-12-01T17:30:00.000Z");
+  });
+
+  test("handles the day the clocks go forward", () => {
+    expect(zonedTimeToUtc("2026-03-29", "19:00").toISOString()).toBe("2026-03-29T17:00:00.000Z");
   });
 });
