@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, lte } from "drizzle-orm";
+import { and, eq, lt, lte } from "drizzle-orm";
 
 import { db } from "@/db";
 import { queue } from "@/db/schema";
@@ -64,10 +64,6 @@ export async function getProcessableEntries() {
 
 export async function setQueueStatus(id: number, status: string) {
   await db.update(queue).set({ status, updatedAt: new Date() }).where(eq(queue.id, id));
-}
-
-export async function listRecentQueue() {
-  return db.select().from(queue).orderBy(desc(queue.createdAt)).limit(50);
 }
 
 export async function expirePastEntries() {

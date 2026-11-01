@@ -61,6 +61,15 @@ export function getWeekday(dateISO: string): Weekday {
   return WEEKDAYS[new Date(`${dateISO}T00:00:00Z`).getUTCDay()];
 }
 
+export function lastDayOfMonth(dateISO: string): string {
+  const date = new Date(`${dateISO}T00:00:00Z`);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+}
+
+export function daysBetween(fromISO: string, untilISO: string): number {
+  return Math.round((Date.parse(untilISO) - Date.parse(fromISO)) / 86_400_000);
+}
+
 /** The dates falling on `weekday` from `fromISO` up to and including `days` days later. */
 export function getWeekdayDates(weekday: Weekday, fromISO: string, days: number): string[] {
   return Array.from({ length: days + 1 }, (_, offset) => addDaysISO(fromISO, offset)).filter(

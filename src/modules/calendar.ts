@@ -1,5 +1,6 @@
 import { and, eq, isNotNull, isNull, lt, or } from "drizzle-orm";
 
+import { BOOKING_MINUTES } from "@/constants";
 import { db } from "@/db";
 import { calendarEvents } from "@/db/schema";
 import { composeInvite, INVITE_SENDER, type CalendarEvent } from "@/modules/calendar-invite";
@@ -7,8 +8,6 @@ import { FastmailSender, MaybeSentError } from "@/modules/fastmail";
 import { config } from "@/utils/config";
 import { addMinutesToTime } from "@/utils/datetime";
 import { logger } from "@/utils/logger";
-
-const BOOKING_MINUTES = 45;
 
 const sender = config.fastmailBaseUrl ? new FastmailSender(config.fastmailBaseUrl, INVITE_SENDER.email) : null;
 let syncing: Promise<void> = Promise.resolve();

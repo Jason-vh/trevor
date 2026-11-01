@@ -14,6 +14,7 @@ Trevor books squash courts at [SquashCity](https://squashcity.baanreserveren.nl/
 - 📋 **Queues requests** when nothing is free, and books the first matching court that opens up (checked every 5 minutes).
 - 🔁 **Weekly bookings** ("every Tuesday at 18:30"): each week is queued once SquashCity opens the day, 7 days ahead, and booked from there. Skip the coming week by removing it from the queue.
 - 📅 **Shows and cancels reservations**, and sends everyone calendar invites from trevor@vhtm.eu: a placeholder while a request is queued, updated to the court once it's booked, and cancelled when it's withdrawn.
+- 🗓️ **Shows upcoming sessions** on a calendar at https://trevor.vhtm.eu: booked courts, queued requests and the weeks still to come from weekly bookings, about two months ahead.
 - 🏆 **Keeps match scores**.
 - ⏰ **Reminds the chat** in the morning when there's squash that day, in the chat that booked the court.
 

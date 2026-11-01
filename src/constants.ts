@@ -3,3 +3,5 @@ export const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Apple
 
 /** SquashCity takes bookings this many days ahead. */
 export const BOOKING_HORIZON_DAYS = 7;
+
+export const BOOKING_MINUTES = 45;

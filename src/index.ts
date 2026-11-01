@@ -3,9 +3,7 @@ import type { Update } from "@grammyjs/types";
 
 import { startTrevor } from "@/agent/trevor";
 import { closeDatabase, migrateDatabase } from "@/db";
-import { getMetadata } from "@/modules/metadata";
-import { listRecentQueue } from "@/modules/queue";
-import { getUpcomingReservations } from "@/modules/reservations";
+import { getUpcomingSessions } from "@/modules/upcoming-sessions";
 import { startCron } from "@/scheduler-cron";
 import { handleMessages } from "@/telegram";
 import { config } from "@/utils/config";
@@ -26,19 +24,8 @@ async function handleRequest(req: Request): Promise<Response> {
     return new Response(Bun.file(dashboardPath));
   }
 
-  if (url.pathname === "/api/reservations" && req.method === "GET") {
-    const reservations = await getUpcomingReservations();
-    return Response.json(reservations);
-  }
-
-  if (url.pathname === "/api/queue" && req.method === "GET") {
-    const entries = await listRecentQueue();
-    return Response.json(entries);
-  }
-
-  if (url.pathname === "/api/status" && req.method === "GET") {
-    const lastCronRun = await getMetadata("last_cron_run");
-    return Response.json({ lastCronRun });
+  if (url.pathname === "/api/sessions" && req.method === "GET") {
+    return Response.json(await getUpcomingSessions());
   }
 
   if (config.webhook) {

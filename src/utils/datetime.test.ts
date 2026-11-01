@@ -6,6 +6,7 @@ import {
   formatMessageTime,
   getMinutesUntil,
   getWeekdayDates,
+  lastDayOfMonth,
   zonedTimeToUtc,
 } from "./datetime";
 
@@ -71,5 +72,13 @@ describe("zonedTimeToUtc", () => {
 
   test("handles the day the clocks go forward", () => {
     expect(zonedTimeToUtc("2026-03-29", "19:00").toISOString()).toBe("2026-03-29T17:00:00.000Z");
+  });
+});
+
+describe("lastDayOfMonth", () => {
+  test("handles month lengths and leap years", () => {
+    expect(lastDayOfMonth("2026-11-01")).toBe("2026-11-30");
+    expect(lastDayOfMonth("2026-12-15")).toBe("2026-12-31");
+    expect(lastDayOfMonth("2028-02-03")).toBe("2028-02-29");
   });
 });
