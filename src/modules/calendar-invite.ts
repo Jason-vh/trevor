@@ -31,10 +31,13 @@ function formatWhen(event: CalendarEvent) {
   return `${day}, ${event.timeFrom}–${event.timeTo}`;
 }
 
-function bodyText(event: CalendarEvent) {
-  if (event.cancelledAt) return "This squash is off.";
-  if (event.court) return `Trevor booked ${event.court}.`;
-  return `Trevor is looking for a court between ${event.timeFrom} and ${event.timeTo}, and will update this once he has one.`;
+function noteFromTrevor(event: CalendarEvent) {
+  const when = formatWhen(event);
+  let note = `I'm on the hunt for a court on ${when}. I'll keep trying, and update this invite as soon as I've got one.`;
+  if (event.court) note = `Got one! 🏸 ${event.court}, ${when}. See you on court.`;
+  if (event.cancelledAt && event.court) note = `Heads up: ${event.court} is cancelled (${when}), so this one's off.`;
+  if (event.cancelledAt && !event.court) note = `I've stopped looking for a court on ${when}, so this one's off.`;
+  return `${note}\n\nTrevor`;
 }
 
 function calendarFile(event: CalendarEvent, method: ICalCalendarMethod) {
@@ -51,6 +54,7 @@ function calendarFile(event: CalendarEvent, method: ICalCalendarMethod) {
     end: zonedTimeToUtc(event.date, event.timeTo),
     summary: title(event),
     location: LOCATION,
+    description: noteFromTrevor(event),
     status,
     organizer: INVITE_SENDER,
     attendees: recipients().map((recipient) => ({
@@ -71,7 +75,7 @@ export async function composeInvite(event: CalendarEvent): Promise<Buffer> {
     from: { name: INVITE_SENDER.name, address: INVITE_SENDER.email },
     to: recipients().map((recipient) => ({ name: recipient.name, address: recipient.email })),
     subject: event.cancelledAt ? `Cancelled: ${subject}` : subject,
-    text: bodyText(event),
+    text: noteFromTrevor(event),
     icalEvent: { method, content: calendarFile(event, method) },
   });
   if (!Buffer.isBuffer(message)) throw new Error("The email was composed as a stream");
