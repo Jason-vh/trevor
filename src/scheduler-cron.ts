@@ -5,6 +5,7 @@ import type { Trevor } from "@/agent/trevor";
 import { syncCalendar } from "@/modules/calendar";
 import { setMetadata } from "@/modules/metadata";
 import { queueUpcomingWeeks } from "@/modules/recurring";
+import { refreshReservations } from "@/modules/reservations";
 import { sendDailyReminders } from "@/modules/reminders";
 import { processQueue } from "@/modules/scheduler";
 import { APP_TIME_ZONE } from "@/utils/datetime";
@@ -23,6 +24,7 @@ async function runTick(bot: Bot, trevor: Trevor) {
 
   await sendDailyReminders(trevor).catch((error) => logger.error("Cron: reminders failed", { error }));
   await syncCalendar();
+  await refreshReservations();
   logger.info("Cron: done");
 }
 

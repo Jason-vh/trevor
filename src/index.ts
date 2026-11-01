@@ -4,6 +4,7 @@ import type { Update } from "@grammyjs/types";
 import { startTrevor } from "@/agent/trevor";
 import { closeDatabase, migrateDatabase } from "@/db";
 import { renderDashboard, renderUnavailable } from "@/dashboard/page";
+import { refreshReservations } from "@/modules/reservations";
 import { getUpcomingSessions } from "@/modules/upcoming-sessions";
 import { startCron } from "@/scheduler-cron";
 import { handleMessages } from "@/telegram";
@@ -82,6 +83,7 @@ async function main() {
   logger.info(`Server listening on port ${server.port}`);
 
   const cronJob = startCron(bot, trevor);
+  void refreshReservations();
 
   const shutdown = async () => {
     cronJob.stop();

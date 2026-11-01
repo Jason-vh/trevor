@@ -6,6 +6,7 @@ import { getBookingOrigins, recordBookingOrigin } from "@/modules/booking-origin
 import { confirmBooking } from "@/modules/calendar";
 import { getCourtTiers } from "@/modules/court-preferences";
 import { expirePastEntries, getProcessableEntries, resetStaleProcessingEntries, setQueueStatus } from "@/modules/queue";
+import { refreshReservations } from "@/modules/reservations";
 import { getSession } from "@/modules/session-manager";
 import { filterByTimeRange, getAllSlotsOnDate } from "@/modules/slots";
 import type { CourtAvailability } from "@/types";
@@ -131,6 +132,7 @@ export async function processQueue(bot: Bot, trevor: Trevor): Promise<void> {
           reservationId: result.reservationId,
         });
         booked++;
+        void refreshReservations();
         // The court is booked: nothing after this may put the entry back in the queue.
         await recordBookingOrigin(entry.chatId, result.slot);
         await announceBooking(bot, trevor, entry, result.slot);

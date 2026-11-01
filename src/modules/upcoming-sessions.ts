@@ -3,7 +3,7 @@ import { and, eq, gte, isNotNull, isNull, lte } from "drizzle-orm";
 import { BOOKING_HORIZON_DAYS, BOOKING_MINUTES } from "@/constants";
 import { db } from "@/db";
 import { queue, recurringBookings } from "@/db/schema";
-import { getUpcomingReservations } from "@/modules/reservations";
+import { getRecentReservations } from "@/modules/reservations";
 import { addDaysISO, addMinutesToTime, getCurrentDateISO, lastDayOfMonth } from "@/utils/datetime";
 import { projectWeeklySessions, type UpcomingSession, type UpcomingSessions } from "@/utils/upcoming-sessions";
 
@@ -29,7 +29,7 @@ export async function getUpcomingSessions(): Promise<UpcomingSessions> {
   const until = lastDayOfMonth(addDaysISO(today, CALENDAR_WEEKS * 7));
 
   const [reservations, pending, rules, queuedDatesByRule] = await Promise.all([
-    getUpcomingReservations(),
+    getRecentReservations(),
     db
       .select()
       .from(queue)

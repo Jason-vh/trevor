@@ -10,7 +10,7 @@ import { cancelBooking, confirmBooking } from "@/modules/calendar";
 import { getCourtTiers, listCourtPreferences, setCourtTier } from "@/modules/court-preferences";
 import { enqueue, listPendingQueue, removeFromQueue } from "@/modules/queue";
 import { addRecurringBooking, listRecurringBookings, stopRecurringBooking } from "@/modules/recurring";
-import { getUpcomingReservations } from "@/modules/reservations";
+import { getUpcomingReservations, refreshReservations } from "@/modules/reservations";
 import { listScores, recordScore } from "@/modules/scores";
 import { getSession } from "@/modules/session-manager";
 import { filterByTimeRange, getAllSlotsOnDate } from "@/modules/slots";
@@ -122,6 +122,7 @@ const bookCourt = defineTool({
     }
 
     logger.info("Tool: book_court succeeded", { ...args, courtName: slot.courtName });
+    void refreshReservations();
     await recordBookingOrigin(await getChatId(api, api.conversationId, context), slot);
     await confirmBooking({
       calendarEventId: null,
@@ -164,6 +165,7 @@ const cancelReservationTool = defineTool({
     }
 
     logger.info("Tool: cancel_reservation succeeded", { reservationId: args.reservation_id });
+    void refreshReservations();
     await cancelBooking(args.date, args.time).catch((error) =>
       logger.warn("Tool: cancel_reservation calendar delete failed", { error }),
     );
