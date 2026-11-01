@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { queue, recurringBookings } from "@/db/schema";
 import { getUpcomingReservations } from "@/modules/reservations";
 import { addDaysISO, addMinutesToTime, getCurrentDateISO, lastDayOfMonth } from "@/utils/datetime";
-import { projectWeeklySessions, type UpcomingSession } from "@/utils/upcoming-sessions";
+import { projectWeeklySessions, type UpcomingSession, type UpcomingSessions } from "@/utils/upcoming-sessions";
 
 const CALENDAR_WEEKS = 8;
 
@@ -24,7 +24,7 @@ async function getQueuedDatesByRule(): Promise<Map<number, Set<string>>> {
 }
 
 /** Booked courts, queued requests and the weeks weekly bookings will queue, from today to about two months out. */
-export async function getUpcomingSessions() {
+export async function getUpcomingSessions(): Promise<UpcomingSessions> {
   const today = getCurrentDateISO();
   const until = lastDayOfMonth(addDaysISO(today, CALENDAR_WEEKS * 7));
 

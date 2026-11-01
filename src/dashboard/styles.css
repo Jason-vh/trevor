@@ -1,0 +1,391 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --paper: #fafaf7;
+  --card: #ffffff;
+  --line: #e8e6e0;
+  --wash: #f2f1ec;
+  --ink: #16181d;
+  --ink-2: #4a4e57;
+  --muted: #8a8d94;
+  --red: #d63a2a;
+  --red-wash: #fdf0ee;
+  --radius: 16px;
+}
+
+html {
+  background: var(--paper);
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-feature-settings: "tnum";
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: max(28px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+    calc(48px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+}
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--red);
+}
+
+.brand {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.brand-sub {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.swatch.is-booked {
+  background: var(--red);
+}
+
+.swatch.is-queued {
+  box-shadow: inset 0 0 0 1.5px var(--red);
+}
+
+.swatch.is-weekly {
+  background: var(--wash);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.next {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 20px;
+  padding: 20px 22px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.next-label {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+
+.next-when {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.next-detail {
+  font-size: 16px;
+  color: var(--ink-2);
+}
+
+.months {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
+  gap: 32px 28px;
+  margin-top: 32px;
+}
+
+.month-name {
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.month-name span {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.weekdays,
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.weekdays {
+  margin-bottom: 6px;
+}
+
+.weekdays span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+}
+
+.day {
+  aspect-ratio: 1;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+
+.day.blank {
+  visibility: hidden;
+}
+
+.day.past {
+  color: #c5c6c9;
+}
+
+.day-num {
+  font-size: 15px;
+  font-weight: 550;
+  line-height: 1;
+}
+
+.day.today .day-num {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin: -5px 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+}
+
+.day-time {
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+}
+
+button.day {
+  cursor: pointer;
+  transition:
+    transform 80ms ease,
+    filter 120ms ease;
+}
+
+button.day:hover {
+  filter: brightness(0.96);
+}
+
+button.day:active {
+  transform: scale(0.95);
+}
+
+button.day:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.day.is-booked {
+  background: var(--red);
+  color: #fff;
+}
+
+.day.is-queued {
+  background: var(--red-wash);
+  box-shadow: inset 0 0 0 1.5px var(--red);
+  color: var(--red);
+}
+
+.day.is-weekly {
+  background: var(--wash);
+  color: var(--ink-2);
+}
+
+.notice {
+  grid-column: 1 / -1;
+  padding: 32px 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.details {
+  width: min(440px, calc(100% - 32px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 24px 60px -20px rgba(22, 24, 29, 0.35);
+}
+
+.details[open] {
+  animation: rise 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.details::backdrop {
+  background: rgba(22, 24, 29, 0.32);
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+}
+
+.details-inner {
+  padding: 22px 22px 24px;
+}
+
+.details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.details-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.details-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--wash);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.session {
+  display: grid;
+  grid-template-columns: 4px 1fr;
+  gap: 14px;
+  padding: 14px 16px 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.session-bar {
+  border-radius: 4px;
+}
+
+.session.is-booked .session-bar {
+  background: var(--red);
+}
+
+.session.is-queued .session-bar {
+  box-shadow: inset 0 0 0 1.5px var(--red);
+}
+
+.session.is-weekly .session-bar {
+  background: var(--line);
+}
+
+.session-status {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.session.is-booked .session-status,
+.session.is-queued .session-status {
+  color: var(--red);
+}
+
+.session-time {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.session-detail {
+  margin-top: 2px;
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+@media (max-width: 520px) {
+  .details {
+    width: 100%;
+    max-width: 100%;
+    margin: auto 0 0;
+    border-radius: 20px 20px 0 0;
+    border-bottom: 0;
+  }
+
+  .details-inner {
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+}

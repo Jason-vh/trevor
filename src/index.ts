@@ -3,6 +3,7 @@ import type { Update } from "@grammyjs/types";
 
 import { startTrevor } from "@/agent/trevor";
 import { closeDatabase, migrateDatabase } from "@/db";
+import { renderDashboard, renderUnavailable } from "@/dashboard/page";
 import { getUpcomingSessions } from "@/modules/upcoming-sessions";
 import { startCron } from "@/scheduler-cron";
 import { handleMessages } from "@/telegram";
@@ -11,7 +12,16 @@ import { logger } from "@/utils/logger";
 
 const bot = new Bot(config.telegram.token);
 
-const dashboardPath = new URL("./dashboard/index.html", import.meta.url).pathname;
+const HTML_HEADERS = { "Content-Type": "text/html; charset=utf-8" };
+
+async function serveDashboard(): Promise<Response> {
+  try {
+    return new Response(renderDashboard(await getUpcomingSessions()), { headers: HTML_HEADERS });
+  } catch (error) {
+    logger.error("Dashboard: failed to load sessions", { error });
+    return new Response(renderUnavailable(), { status: 503, headers: HTML_HEADERS });
+  }
+}
 
 async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url);
@@ -20,12 +30,8 @@ async function handleRequest(req: Request): Promise<Response> {
     return new Response("OK");
   }
 
-  if (url.pathname === "/") {
-    return new Response(Bun.file(dashboardPath));
-  }
-
-  if (url.pathname === "/api/sessions" && req.method === "GET") {
-    return Response.json(await getUpcomingSessions());
+  if (url.pathname === "/" && req.method === "GET") {
+    return serveDashboard();
   }
 
   if (config.webhook) {

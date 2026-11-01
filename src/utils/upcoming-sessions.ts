@@ -1,12 +1,16 @@
 import { daysBetween, getWeekdayDates, type Weekday } from "@/utils/datetime";
 
+export type SessionStatus = "booked" | "queued" | "weekly";
+
 export type UpcomingSession = {
   date: string;
   timeFrom: string;
   timeTo: string;
   court: string | null;
-  status: "booked" | "queued" | "weekly";
+  status: SessionStatus;
 };
+
+export type UpcomingSessions = { today: string; until: string; sessions: UpcomingSession[] };
 
 type WeeklyRule = { id: number; weekday: string; timeFrom: string; timeTo: string };
 
