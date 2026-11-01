@@ -39,7 +39,7 @@ function detailsId(dateISO: string): string {
 function sessionDetail(session: UpcomingSession): string {
   if (session.status === "booked") return session.court ?? "";
   if (session.status === "queued") return "Looking for a court starting in this window";
-  return "Weekly, queued once SquashCity opens the day";
+  return "Queued when SquashCity is ready";
 }
 
 /** Every month from today's up to and including `until`'s, with blanks before the 1st to start weeks on Monday. */
